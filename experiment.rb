@@ -77,13 +77,21 @@ sh %'psql -d "#{db_from_name}"  -c "CREATE SCHEMA pcr;"'
 
 HEADER 'Copying data to new schema'
 File.delete dump_file if File.exist? dump_file
+# need the --blobs flag?
+#
+# -b
+# --blobs
+# Include large objects in the dump. This is the default behavior except when --schema, --table,
+# # or --schema-only is specified. The -b switch is therefore only useful to add large objects to
+# dumps where a specific schema or table has been requested. Note that blobs are considered data
+# and therefore will be included when --data-only is used, but not when --schema-only is.
 sh "pg_dump --schema=public #{db_from_name} | sed '/^SET search_path/s/public,/pcr,/' > #{dump_file}"
 sh "psql -d #{db_from_name} -f #{dump_file}"
 
 
 HEADER 'Querying to verify'
-outstream.puts indent sh "psql -d #{db_from_name} -c 'select * from public.table1 UNION select * from public.table2'"
-outstream.puts indent sh "psql -d #{db_from_name} -c 'select * from pcr.table1 UNION select * from pcr.table2'"
+outstream.puts indent sh "psql -d #{db_from_name} -c 'select * from public.table1 JOIN pcr.table1 ON public.table1.id = pcr.table1.id'"
+outstream.puts indent sh "psql -d #{db_from_name} -c 'select * from public.table2 JOIN pcr.table2 ON public.table2.id = pcr.table2.id'"
 
 HEADER "Dumping the pcr schema"
-outstream.puts indent sh "pg_dump --schema=pcr #{db_from_name}"
+outstream.puts indent sh "pg_dump --schema=pcr #{db_from_name} > data-pcr.sql"
