@@ -15,6 +15,24 @@ RSpec.describe 'Figuring out what it should do' do
                    time:        time
   end
 
+  def insert_users(users, client: self.client)
+    users.each do |key, value|
+      client.insert 'users', name: key.to_s, colour: value
+    end
+  end
+
+  def assert_users(assertions, client: self.client)
+    results = client.select_all 'users'
+    assertions.each do |key, values|
+      expect(pluck results, key).to eq values
+    end
+  end
+
+  def pluck(hashes, key)
+    hashes.map { |hash| hash.fetch key }
+  end
+
+
 
   describe 'initial state' do
     it 'starts on the primary branch pointing at the root commit, which is empty' do
@@ -49,14 +67,14 @@ RSpec.describe 'Figuring out what it should do' do
     it 'remembers which branch it is on' do
       client.create_branch 'other'
       expect(client.branch.name).to eq 'primary'
-      client.switch_branches 'other'
+      client.switch_branch 'other'
       expect(client.branch.name).to eq 'other'
     end
 
     it 'returns to the primary branch when it deletes the branch it is on' do
       client.create_branch 'crnt'
       client.create_branch 'other'
-      client.switch_branches 'crnt'
+      client.switch_branch 'crnt'
 
       # branch stays the same b/c other got deleted
       expect(client.branch.name).to eq 'crnt'
@@ -70,23 +88,6 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
   describe 'when making changes' do
-    def insert_users(users, client: self.client)
-      users.each do |key, value|
-        client.insert 'users', name: key.to_s, colour: value
-      end
-    end
-
-    def assert_users(assertions, client: self.client)
-      results = client.select_all 'users'
-      assertions.each do |key, values|
-        expect(pluck results, key).to eq values
-      end
-    end
-
-    def pluck(hashes, key)
-      hashes.map { |hash| hash.fetch key }
-    end
-
     # I suppose, ideally, it would record the current user/time when doing this,
     # but I think that would require changes to existing queries
     describe 'via insert' do

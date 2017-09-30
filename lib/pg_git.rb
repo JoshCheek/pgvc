@@ -10,17 +10,17 @@ class PgGit
     self.tables = {}
   end
 
-  def switch_branches(new_branch_name)
+  def switch_branch(new_branch_name)
     self.current_branch_name = new_branch_name
     self
   end
 
-  def branch
-    all_branches.fetch current_branch_name
-  end
-
   def commit
     branch.commit
+  end
+
+  def branch
+    all_branches.fetch current_branch_name
   end
 
   def branches
@@ -40,7 +40,7 @@ class PgGit
       raise Branch::CannotDelete, "Cannot delete the default branch, #{DEFAULT_BRANCH_NAME.inspect}"
     deleted = all_branches.delete(name)
     deleted.name == current_branch_name and
-      switch_branches DEFAULT_BRANCH_NAME
+      switch_branch DEFAULT_BRANCH_NAME
     self
   end
 
@@ -63,6 +63,12 @@ class PgGit
 
   def delete(table_name, where:)
     table(table_name).reject! { |row| match? row, where }
+    self
+  end
+
+  def commit!(attributes)
+    branch.open_commit! next_id!  if commit.complete?
+    commit.complete! attributes
     self
   end
 
@@ -100,6 +106,7 @@ class PgGit
     end
 
     def open_commit!(id)
+      raise "WTF?" unless commit.complete?
       self.commit = Commit.new id: id, parents: [commit], complete: false
       self
     end
@@ -113,7 +120,7 @@ end
 
 class PgGit
   class Commit
-    attr_reader :id, :parents
+    attr_reader :id, :parents, :synopsis, :description, :user, :time
 
     def initialize(id:, parents:, complete:)
       self.id       = id
@@ -125,9 +132,30 @@ class PgGit
       complete
     end
 
+    def complete!(synopsis:, description:, user:, time:)
+      raise "Wtf?" if complete?
+      self.complete    = true
+      self.synopsis    = synopsis
+      self.description = description
+      self.user        = user
+      self.time        = time
+    end
+
+    def [](key)
+      case key
+      when :id                   then id
+      when :synopsis             then synopsis
+      when :description          then description
+      when :user                 then user
+      when :time                 then time
+      when :complete, :complete? then complete?
+      else raise "Not an attribute: #{key.inspect}"
+      end
+    end
+
     private
 
     attr_accessor :complete
-    attr_writer :id, :parents
+    attr_writer :id, :parents, :synopsis, :description, :user, :time
   end
 end
