@@ -2,9 +2,19 @@
 require 'pg_git'
 
 RSpec.describe 'Figuring out what it should do' do
-  let :client do
-    PgGit.new
+  let(:client) { PgGit.new }
+
+  def create_commit(synopsis:    'default synopsis',
+                    description: 'default description',
+                    user:        'default user',
+                    time:        Time.now,
+                    client:      self.client)
+    client.commit! synopsis:    synopsis,
+                   description: description,
+                   user:        user,
+                   time:        time
   end
+
 
   describe 'initial state' do
     it 'starts on the primary branch pointing at the root commit, which is empty' do
@@ -79,46 +89,64 @@ RSpec.describe 'Figuring out what it should do' do
 
     # I suppose, ideally, it would record the current user/time when doing this,
     # but I think that would require changes to existing queries
-    it 'can insert rows and query them back out' do
-      expect(client.select_all('users')).to eq []
-      insert_users u1: 'brown', u2: 'green'
-      assert_users name: %w[u1 u2], colour: %w[brown green]
+    describe 'via insert' do
+      it 'can insert rows and query them back out' do
+        expect(client.select_all('users')).to eq []
+        insert_users u1: 'brown', u2: 'green'
+        assert_users name: %w[u1 u2], colour: %w[brown green]
+      end
+
+      it 'creates a new incomplete commit to hold the changes and points the branch at it' do
+        prev = client.commit
+        insert_users u1: 'brown'
+        crnt = client.commit
+        expect(prev.id).to_not eq crnt.id
+        expect(prev).to be_complete
+        expect(crnt).to_not be_complete
+      end
+
+      it 'sets the old commit as a parent of the new commit' do
+        prev = client.commit
+        insert_users u1: 'brown'
+        crnt = client.commit
+        expect(prev.parents).to eq []
+        expect(crnt.parents).to eq [prev]
+      end
     end
 
-    it 'can update rows and query them backout' do
-      insert_users u1: 'brown', u2: 'green', u3: 'cyan'
-      client.update 'users', where: {name: 'u2'}, to: {colour: 'magenta'}
-      assert_users name: %w[u1 u2 u3], colour: %w[brown magenta cyan]
-      client.update 'users', where: {name: 'u3'}, to: {colour: 'black'}
-      assert_users name: %w[u1 u2 u3], colour: %w[brown magenta black]
+
+    describe 'via update' do
+      it 'can update rows and query them backout' do
+        insert_users u1: 'brown', u2: 'green', u3: 'cyan'
+        client.update 'users', where: {name: 'u2'}, to: {colour: 'magenta'}
+        assert_users name: %w[u1 u2 u3], colour: %w[brown magenta cyan]
+        client.update 'users', where: {name: 'u3'}, to: {colour: 'black'}
+        assert_users name: %w[u1 u2 u3], colour: %w[brown magenta black]
+      end
+
+      it 'creates a new incomplete commit to hold the changes and points the branch at it'
+        # insert_users u1: 'brown'
+        # create_commit
+
+      it 'sets the old commit as a parent of the new commit'
     end
 
-    it 'can delete rows, which do not come back out when queried' do
-      insert_users u1: 'brown', u2: 'green', u3: 'cyan'
 
-      assert_users name: %w[u1 u2 u3], colour: %w[brown green cyan]
-      client.delete 'users', where: {name: 'u2'}
-      assert_users name: %w[u1 u3], colour: %w[brown cyan]
-      client.delete 'users', where: {name: 'u1'}
-      assert_users name: %w[u3], colour: %w[cyan]
-      client.delete 'users', where: {name: 'u3'}
-      assert_users name: %w[], colour: %w[]
-    end
+    describe 'via delete' do
+      it 'can delete rows, which do not come back out when queried' do
+        insert_users u1: 'brown', u2: 'green', u3: 'cyan'
 
-    it 'creates a new incomplete commit to hold the changes and points the branch at it' do
-      prev = client.commit
-      insert_users u1: 'brown'
-      crnt = client.commit
-      expect(prev).to be_complete
-      expect(crnt).to be_complete
-    end
+        assert_users name: %w[u1 u2 u3], colour: %w[brown green cyan]
+        client.delete 'users', where: {name: 'u2'}
+        assert_users name: %w[u1 u3], colour: %w[brown cyan]
+        client.delete 'users', where: {name: 'u1'}
+        assert_users name: %w[u3], colour: %w[cyan]
+        client.delete 'users', where: {name: 'u3'}
+        assert_users name: %w[], colour: %w[]
+      end
 
-    it 'sets the old commit as a parent of the new commit' do
-      prev = client.commit
-      insert_users u1: 'brown'
-      crnt = client.commit
-      expect(prev.parents).to eq []
-      expect(crnt.parents).to eq [prev]
+      it 'creates a new incomplete commit to hold the changes and points the branch at it'
+      it 'sets the old commit as a parent of the new commit'
     end
 
     it 'groups all the changes together on the incomplete commit'
@@ -130,17 +158,6 @@ RSpec.describe 'Figuring out what it should do' do
       assertions.each do |key, value|
         expect(commit[key]).to eq value
       end
-    end
-
-    def create_commit(synopsis:    'default synopsis',
-                      description: 'default description',
-                      user:        'default user',
-                      time:        Time.now,
-                      client:      self.client)
-      client.commit! synopsis:    synopsis,
-                     description: description,
-                     user:        user,
-                     time:        time
     end
 
     it 'accepts a synopsis, description, user, and time' do
@@ -158,12 +175,12 @@ RSpec.describe 'Figuring out what it should do' do
     describe 'when the commit is incomplete' do
       before do
         insert_users u1: 'brown'
-        assert_commit is_complete: false
+        assert_commit complete?: false
       end
 
       it 'completes the commit' do
         create_commit
-        assert_commit is_complete: true
+        assert_commit complete?: true
       end
 
       it 'does not update the branch' do
@@ -174,7 +191,7 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     describe 'when the commit is complete' do
-      before { assert_commit is_complete: true }
+      before { assert_commit complete?: true }
       it 'creates a new complete commit, which is empty' do
         prev = client.commit
         create_commit

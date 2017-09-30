@@ -3,7 +3,7 @@ class PgGit
   DEFAULT_BRANCH_NAME = 'primary'.freeze
 
   def initialize
-    root_commit = Commit.new parents: []
+    root_commit = Commit.new id: next_id!, parents: [], complete: true
     branch = Branch.new name: DEFAULT_BRANCH_NAME, commit: root_commit
     self.all_branches = {branch.name => branch}
     self.current_branch_name = branch.name
@@ -19,12 +19,16 @@ class PgGit
     all_branches.fetch current_branch_name
   end
 
+  def commit
+    branch.commit
+  end
+
   def branches
     all_branches.values
   end
 
   def create_branch(name)
-    fixme = Commit.new parents: []
+    fixme = Commit.new id: next_id!, parents: [], complete: true
     all_branches.include? name and
       raise Branch::CannotCreate, "There is already a branch named #{name.inspect}"
     all_branches[name] = Branch.new name: name, commit: fixme
@@ -45,7 +49,20 @@ class PgGit
   end
 
   def insert(table_name, attributes)
+    branch.open_commit! next_id! if commit.complete?
     table(table_name) << attributes
+    self
+  end
+
+  def update(table_name, where:, to:)
+    table(table_name)
+      .select { |row| match? row, where }
+      .each   { |row| row.merge! to }
+    self
+  end
+
+  def delete(table_name, where:)
+    table(table_name).reject! { |row| match? row, where }
     self
   end
 
@@ -53,9 +70,20 @@ class PgGit
 
   attr_accessor :all_branches, :current_branch_name, :tables
 
+  def next_id!
+    @current_id ||= 0
+    @current_id = @current_id + 1
+  end
+
   def table(name)
     return tables.fetch name if tables.include? name
     tables[name] = []
+  end
+
+  def match?(row, criteria)
+    criteria.all? do |key, value|
+      row[key] == value
+    end
   end
 end
 
@@ -71,6 +99,11 @@ class PgGit
       self.commit = commit
     end
 
+    def open_commit!(id)
+      self.commit = Commit.new id: id, parents: [commit], complete: false
+      self
+    end
+
     private
 
     attr_writer :name, :commit
@@ -80,13 +113,21 @@ end
 
 class PgGit
   class Commit
-    attr_reader :parents
-    def initialize(parents:)
-      self.parents = parents
+    attr_reader :id, :parents
+
+    def initialize(id:, parents:, complete:)
+      self.id       = id
+      self.parents  = parents
+      self.complete = complete
+    end
+
+    def complete?
+      complete
     end
 
     private
 
-    attr_writer :parents
+    attr_accessor :complete
+    attr_writer :id, :parents
   end
 end
