@@ -2,6 +2,10 @@
 require 'pg_git'
 
 RSpec.describe 'Figuring out what it should do' do
+  let :client do
+    PgGit.new
+  end
+
   describe 'initial state' do
     it 'starts on the primary branch pointing at the root commit, which is empty' do
       branch = client.branch
@@ -15,13 +19,19 @@ RSpec.describe 'Figuring out what it should do' do
     # and should be changeable, but for now, it's not worth the complexity
     it 'can create and delete branches' do
       client.create_branch 'omghi'
-      expect(client.branches.map(&:name).sort).to eq ['primary', 'omghi']
+      expect(client.branches.map(&:name).sort).to eq ['omghi', 'primary']
       client.delete_branch 'omghi'
+    end
+
+    it 'can\'t create a banch with the same name as an existing branch' do
+      client.create_branch 'omghi'
+      expect { client.create_branch 'omghi' }
+        .to raise_error PgGit::Branch::CannotCreate
     end
 
     it 'can\'t delete the primary branch' do
       expect { client.delete_branch 'primary' }
-        .to raise_error PgGit::CannotDeleteBranch
+        .to raise_error PgGit::Branch::CannotDelete
     end
 
     it 'can create a branch pointing to an arbitrary commit'
@@ -30,7 +40,7 @@ RSpec.describe 'Figuring out what it should do' do
       client.create_branch 'other'
       expect(client.branch.name).to eq 'primary'
       client.switch_branches 'other'
-      expect(client.branch.anme).to eq 'other'
+      expect(client.branch.name).to eq 'other'
     end
 
     it 'returns to the primary branch when it deletes the branch it is on' do
@@ -40,7 +50,7 @@ RSpec.describe 'Figuring out what it should do' do
 
       # branch stays the same b/c other got deleted
       expect(client.branch.name).to eq 'crnt'
-      expect(client.delete_branch).to eq 'other'
+      client.delete_branch 'other'
       expect(client.branch.name).to eq 'crnt'
 
       # branch changes b/c crnt got deleted
@@ -52,7 +62,7 @@ RSpec.describe 'Figuring out what it should do' do
   describe 'when making changes' do
     def insert_users(users, client: self.client)
       users.each do |key, value|
-        client.insert 'users', name: key, colour: value
+        client.insert 'users', name: key.to_s, colour: value
       end
     end
 
@@ -70,7 +80,7 @@ RSpec.describe 'Figuring out what it should do' do
     # I suppose, ideally, it would record the current user/time when doing this,
     # but I think that would require changes to existing queries
     it 'can insert rows and query them back out' do
-      expect(client.query_all('users')).to eq []
+      expect(client.select_all('users')).to eq []
       insert_users u1: 'brown', u2: 'green'
       assert_users name: %w[u1 u2], colour: %w[brown green]
     end
