@@ -4,7 +4,14 @@ RSpec.describe 'PgGit::Database' do
   let(:db) { PgGit::Database.new }
 
   describe 'schema management' do
-    it 'can create and drop schemas'
+    it 'can create and drop schemas' do
+      expect(db.schema_names).to eq [:public]
+      db.create_schema :othah1
+      db.create_schema :othah2
+      expect(db.schema_names).to eq [:public, :othah1, :othah2]
+      db.drop_schema :othah1
+      expect(db.schema_names).to eq [:public, :othah2]
+    end
   end
 
   describe 'table management' do
@@ -19,8 +26,22 @@ RSpec.describe 'PgGit::Database' do
         .to change { db.tables.include? :users }.from(true).to(false)
     end
 
-    it 'creates the table in the public schema by default'
-    it 'can create the table in other schemas'
+    it 'creates and drops the table in the public schema by default' do
+      db.create_schema :other
+      db.create_table :some_table
+      expect(db.tables schema: :public).to include :some_table
+      expect(db.tables schema: :other).to_not include :some_table
+    end
+
+    it 'can create and drop the table in another schemas' do
+      db.create_schema :other
+      db.create_table :some_table, schema: :other
+      expect(db.tables schema: :public).to_not include :some_table
+      expect(db.tables schema: :other).to include :some_table
+      db.drop_table :some_table, schema: :other
+      expect(db.tables schema: :public).to_not include :some_table
+      expect(db.tables schema: :other).to_not include :some_table
+    end
   end
 
 

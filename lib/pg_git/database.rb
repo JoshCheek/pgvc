@@ -3,17 +3,28 @@ class PgGit
     InvalidColumn = Class.new StandardError
 
     def initialize
-      self.schemas = {
-        public: { tables: {} }
-      }
+      self.schemas = {}
+      create_schema :public
     end
 
-    def tables
-      schemas[:public][:tables]
+    def create_schema(name)
+      schemas[name] = { tables: {} }
     end
 
-    def create_table(name, primary_key:, columns:)
-      tables[name] = {
+    def drop_schema(name)
+      schemas.delete name
+    end
+
+    def schema_names
+      schemas.keys
+    end
+
+    def tables(schema: :public)
+      schemas.fetch(schema).fetch(:tables)
+    end
+
+    def create_table(name, schema: :public, primary_key: nil, columns: [])
+      tables(schema: schema)[name] = {
         name:        name,
         primary_key: primary_key,
         columns:     columns,
@@ -21,8 +32,8 @@ class PgGit
       }
     end
 
-    def drop_table(name)
-      tables.delete name
+    def drop_table(name, schema: :public)
+      tables(schema: schema).delete name
     end
 
     def insert(name, values:)
