@@ -40,7 +40,7 @@ RSpec.describe 'PgGit::Database' do
       ]
     end
 
-    it 'raises when an insert statement omits columns, ecept the primary key' do
+    it 'raises when an insert statement omits columns, except the primary key' do
       db.insert :users, values: {name: 'Josh', is_admin: true}
       expect { db.insert :users, values: {name: 'Josh'} }
         .to raise_error PgGit::Database::InvalidInsertion
@@ -90,6 +90,7 @@ RSpec.describe 'PgGit::Database' do
       db.insert :users, values: {name: 'Maya', is_admin: true}
       db.insert :users, values: {name: 'Maya', is_admin: false}
 
+      expect(db.select :users, where: {name: 'noone'}).to eq []
       expect(db.select :users, where: {name: 'Josh'}).to eq [
         {id: 1, name: 'Josh', is_admin: true},
         {id: 2, name: 'Josh', is_admin: false},
