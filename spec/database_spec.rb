@@ -43,15 +43,15 @@ RSpec.describe 'PgGit::Database' do
     it 'raises when an insert statement omits columns, except the primary key' do
       db.insert :users, values: {name: 'Josh', is_admin: true}
       expect { db.insert :users, values: {name: 'Josh'} }
-        .to raise_error PgGit::Database::InvalidInsertion
+        .to raise_error PgGit::Database::InvalidColumn
       expect { db.insert :users, values: {is_admin: true} }
-        .to raise_error PgGit::Database::InvalidInsertion
+        .to raise_error PgGit::Database::InvalidColumn
     end
 
     it 'raises when nonexistent columns are provided' do
       db.insert :users, values: {name: 'Josh', is_admin: true}
       expect { db.insert :users, values: {name: 'Josh', is_admin: true, other: 'whatevz'} }
-        .to raise_error PgGit::Database::InvalidInsertion
+        .to raise_error PgGit::Database::InvalidColumn
     end
   end
 
@@ -113,9 +113,44 @@ RSpec.describe 'PgGit::Database' do
   end
 
   describe 'updating rows from a table' do
-    it 'can update specified columns' do
+    before do
+      db.create_table :users, primary_key: :id, columns: %i[name is_admin]
     end
-    it 'can update only rows matching a where clause'
+
+    it 'can update specified columns' do
+      db.insert :users, values: {name: 'Josh', is_admin: true}
+      db.insert :users, values: {name: 'Maya', is_admin: false}
+      db.insert :users, values: {name: 'Bert', is_admin: false}
+
+      db.update :users, values: {is_admin: true}
+
+      expect(db.select :users).to eq [
+        {id: 1, name: 'Josh', is_admin: true},
+        {id: 2, name: 'Maya', is_admin: true},
+        {id: 3, name: 'Bert', is_admin: true},
+      ]
+    end
+
+
+    it 'can update only rows matching a where clause' do
+      db.insert :users, values: {name: 'Josh', is_admin: true}
+      db.insert :users, values: {name: 'Josh', is_admin: false}
+      db.insert :users, values: {name: 'Maya', is_admin: false}
+
+      db.update :users, values: {is_admin: true}, where: {name: 'Josh'}
+
+      expect(db.select :users).to eq [
+        {id: 1, name: 'Josh', is_admin: true},
+        {id: 2, name: 'Josh', is_admin: true},
+        {id: 3, name: 'Maya', is_admin: false},
+      ]
+    end
+
+    it 'raises when nonexistent columns are provided' do
+      db.insert :users, values: {name: 'Josh', is_admin: true}
+      expect { db.update :users, values: {other: 'whatevz'} }
+        .to raise_error PgGit::Database::InvalidColumn
+    end
   end
 
   describe 'deleting rows from a table' do
