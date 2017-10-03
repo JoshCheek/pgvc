@@ -36,8 +36,8 @@ class PgGit
       tables(schema: schema).delete name
     end
 
-    def insert(name, values:)
-      table = tables.fetch name
+    def insert(name, values:, schema: :public)
+      table = tables(schema: schema).fetch name
       validate_all_provided! table, values
       validate_no_extras!    table, values
 
@@ -47,29 +47,29 @@ class PgGit
       rows << {primary_key => max_pk.succ, **values}
     end
 
-    def select(name, where: true, columns: '*')
-      tables.fetch(name).fetch(:rows).select do |row|
-        case where
-        when true
-          true
-        when Hash
-          where.all? do |column, value|
-            row.fetch(column) == value
-          end
-        else
-          raise "Wat: #{where.inspect}"
-        end
-      end.map do |row|
-        next row if columns == '*'
-        row.select { |column, _| columns.include? column }
+    def select(name, where: true, columns: '*', schema: :public)
+      tables(schema: schema).fetch(name).fetch(:rows)
+        .select { |row| row_matches? row, where }
+        .map { |row|
+          next row if columns == '*'
+          row.select { |column, _| columns.include? column }
+        }
+    end
+
+    def update(name, values:, where: true, schema: :public)
+      validate_no_extras! tables(schema: schema).fetch(name), values
+      select(name, schema: schema, where: where).each do |row|
+        row.merge! values
       end
     end
 
-    def update(name, values:, where: true)
-      validate_no_extras!  tables.fetch(name), values
-      select(name, where: where).each do |row|
-        row.merge! values
-      end
+    def delete(name, where:, schema: :public)
+      # note that this implies we need to keep track of the next primary key
+      # rather than computing it, but I don't think we need that much functionality,
+      # so just going ot ignore it for now :)
+      table = tables(schema: schema).fetch(name)
+      rows  = table.fetch :rows
+      rows.reject! { |row| row_matches? row, where }
     end
 
     private
@@ -93,6 +93,17 @@ class PgGit
         next if columns.include? column
         next if primary_key == column
         raise InvalidColumn, "#{name.inspect} expects #{columns.inspect}, but was given #{column.inspect}"
+      end
+    end
+
+    def row_matches?(row, where)
+      case where
+      when true
+        true
+      when Hash
+        where.all? { |column, value| row.fetch(column) == value }
+      else
+        raise "Wat: #{where.inspect}"
       end
     end
   end
