@@ -1,7 +1,7 @@
-require 'pg_git/database'
+require 'pg_git/ruby_database'
 
-RSpec.describe 'PgGit::Database' do
-  let(:db) { PgGit::Database.new }
+RSpec.describe 'PgGit::RubyDatabase' do
+  let(:db) { PgGit::RubyDatabase.new }
 
   describe 'table management' do
     it 'can create a table' do
@@ -36,15 +36,15 @@ RSpec.describe 'PgGit::Database' do
     it 'raises when an insert statement omits columns, except the primary key' do
       db.insert :users, values: {name: 'Josh', is_admin: true}
       expect { db.insert :users, values: {name: 'Josh'} }
-        .to raise_error PgGit::Database::InvalidColumn
+        .to raise_error PgGit::RubyDatabase::InvalidColumn
       expect { db.insert :users, values: {is_admin: true} }
-        .to raise_error PgGit::Database::InvalidColumn
+        .to raise_error PgGit::RubyDatabase::InvalidColumn
     end
 
     it 'raises when nonexistent columns are provided' do
       db.insert :users, values: {name: 'Josh', is_admin: true}
       expect { db.insert :users, values: {name: 'Josh', is_admin: true, other: 'whatevz'} }
-        .to raise_error PgGit::Database::InvalidColumn
+        .to raise_error PgGit::RubyDatabase::InvalidColumn
     end
 
   end
@@ -143,7 +143,7 @@ RSpec.describe 'PgGit::Database' do
     it 'raises when nonexistent columns are provided' do
       db.insert :users, values: {name: 'Josh', is_admin: true}
       expect { db.update :users, values: {other: 'whatevz'} }
-        .to raise_error PgGit::Database::InvalidColumn
+        .to raise_error PgGit::RubyDatabase::InvalidColumn
     end
   end
 

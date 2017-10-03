@@ -1,5 +1,5 @@
 class PgGit
-  class Database
+  class RubyDatabase
     InvalidColumn = Class.new StandardError
 
     def initialize
