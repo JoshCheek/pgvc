@@ -1,5 +1,7 @@
 class PgGit
   BaseError = Class.new StandardError
+  InvalidColumn = Class.new BaseError
+
   DEFAULT_BRANCH_NAME = 'primary'.freeze
 
   def initialize

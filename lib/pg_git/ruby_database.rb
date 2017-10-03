@@ -1,7 +1,7 @@
+require 'pg_git'
+
 class PgGit
   class RubyDatabase
-    InvalidColumn = Class.new StandardError
-
     def initialize
       self.schemas = {}
       create_schema :public
