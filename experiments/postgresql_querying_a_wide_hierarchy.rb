@@ -55,7 +55,7 @@ end
 
 
 # Insert the data:
-depth   = 19
+depth   = 20
 max     = 2**depth - 1
 numbers = 1.upto max
 string  = 'a'
@@ -87,8 +87,8 @@ db.exec <<-SQL
 SQL
 
 # How much data?
-db.exec('SELECT count(1) FROM strings;').to_a # => [{"count"=>"524287"}]
-db.exec('SELECT count(1) FROM ancestry;').to_a # => [{"count"=>"524286"}]
+db.exec('SELECT count(1) FROM strings;').to_a # => [{"count"=>"1048575"}]
+db.exec('SELECT count(1) FROM ancestry;').to_a # => [{"count"=>"1048574"}]
 
 # Get the hierarchy of the last char
 def time
@@ -99,28 +99,29 @@ def time
 end
 
 # Run the query once to prime it (reduces the time by a factor of 10)
-time { find_ancestors(db, max).to_a }[:seconds] # => 0.003269
+time { find_ancestors(db, max).to_a }[:seconds] # => 0.009216
 
 # And once to see how it performs (choosing a different id so it can't have cached the result)
 time { find_ancestors(db, max-1).to_a }
-# => {:seconds=>0.000488,
+# => {:seconds=>0.000737,
 #     :result=>
-#      [{"depth"=>"0", "id"=>"524286", "val"=>"acunv"},
-#       {"depth"=>"1", "id"=>"262143", "val"=>"nwtk"},
-#       {"depth"=>"2", "id"=>"131071", "val"=>"gkwe"},
-#       {"depth"=>"3", "id"=>"65535", "val"=>"crxo"},
-#       {"depth"=>"4", "id"=>"32767", "val"=>"avlg"},
-#       {"depth"=>"5", "id"=>"16383", "val"=>"xfc"},
-#       {"depth"=>"6", "id"=>"8191", "val"=>"lca"},
-#       {"depth"=>"7", "id"=>"4095", "val"=>"fam"},
-#       {"depth"=>"8", "id"=>"2047", "val"=>"bzs"},
-#       {"depth"=>"9", "id"=>"1023", "val"=>"ami"},
-#       {"depth"=>"10", "id"=>"511", "val"=>"sq"},
-#       {"depth"=>"11", "id"=>"255", "val"=>"iu"},
-#       {"depth"=>"12", "id"=>"127", "val"=>"dw"},
-#       {"depth"=>"13", "id"=>"63", "val"=>"bk"},
-#       {"depth"=>"14", "id"=>"31", "val"=>"ae"},
-#       {"depth"=>"15", "id"=>"15", "val"=>"o"},
-#       {"depth"=>"16", "id"=>"7", "val"=>"g"},
-#       {"depth"=>"17", "id"=>"3", "val"=>"c"},
-#       {"depth"=>"18", "id"=>"1", "val"=>"a"}]}
+#      [{"depth"=>"0", "id"=>"1048574", "val"=>"bgqct"},
+#       {"depth"=>"1", "id"=>"524287", "val"=>"acunw"},
+#       {"depth"=>"2", "id"=>"262143", "val"=>"nwtk"},
+#       {"depth"=>"3", "id"=>"131071", "val"=>"gkwe"},
+#       {"depth"=>"4", "id"=>"65535", "val"=>"crxo"},
+#       {"depth"=>"5", "id"=>"32767", "val"=>"avlg"},
+#       {"depth"=>"6", "id"=>"16383", "val"=>"xfc"},
+#       {"depth"=>"7", "id"=>"8191", "val"=>"lca"},
+#       {"depth"=>"8", "id"=>"4095", "val"=>"fam"},
+#       {"depth"=>"9", "id"=>"2047", "val"=>"bzs"},
+#       {"depth"=>"10", "id"=>"1023", "val"=>"ami"},
+#       {"depth"=>"11", "id"=>"511", "val"=>"sq"},
+#       {"depth"=>"12", "id"=>"255", "val"=>"iu"},
+#       {"depth"=>"13", "id"=>"127", "val"=>"dw"},
+#       {"depth"=>"14", "id"=>"63", "val"=>"bk"},
+#       {"depth"=>"15", "id"=>"31", "val"=>"ae"},
+#       {"depth"=>"16", "id"=>"15", "val"=>"o"},
+#       {"depth"=>"17", "id"=>"7", "val"=>"g"},
+#       {"depth"=>"18", "id"=>"3", "val"=>"c"},
+#       {"depth"=>"19", "id"=>"1", "val"=>"a"}]}
