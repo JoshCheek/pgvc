@@ -37,17 +37,16 @@ def find_ancestors(db, id)
         SELECT prev.depth+1, crnt.parent_id
         FROM ancestors prev
         JOIN ancestry  crnt ON (prev.id = crnt.child_id)
-        -- GROUP BY crnt.parent_id
-      )--,
+      ),
 
-      -- unique_ancestors (depth, id) AS (
-      --   SELECT min(depth), id
-      --   FROM ancestors
-      --   GROUP BY id
-      -- )
+      unique_ancestors (depth, id) AS (
+        SELECT min(depth), id
+        FROM ancestors
+        GROUP BY id
+      )
 
     SELECT depth, chars.*
-    FROM ancestors a
+    FROM unique_ancestors a
     JOIN chars ON (chars.id = a.id)
     ORDER BY a.depth; -- add DESC to get the path from the root to the node in question
   SQL
@@ -112,18 +111,13 @@ end
 # Additionally:
 #   L will have parent E
 #   F will have a parent H
-# expected ancestry: L (F E) (C B H) (D A)  ...is this right? can there be conflicts?
+# expected ancestry: (L) (F E) (C B H) (D A)  ...is this right? can there be conflicts?
 l, e, f, h = 12, 5, 6, 8
 db.exec_params "INSERT INTO ancestry (parent_id, child_id) VALUES ($1, $2), ($3, $4)",
                                                                   [ e,  l,    h,  f]
 find_ancestors(db, 12) # L
-  .map(&:values) # => [["0", "12", "L"], ["1", "6", "F"], ["1", "5", "E"], ["2", "2", "B"], ["2", "3", "C"], ["2", "8", "H"], ["3", "1", "A"], ["3", "1", "A"], ["3", "4", "D"], ["4", "2", "B"], ["5", "1", "A"]]
+  .map(&:values) # => [["0", "12", "L"], ["1", "5", "E"], ["1", "6", "F"], ["2", "2", "B"], ["2", "3", "C"], ["2", "8", "H"], ["3", "4", "D"], ["3", "1", "A"]]
   .group_by(&:first)
-  .map { |k, vs|  [k, vs.map(&:last)] }
-  .to_h
-# => {"0"=>["L"],
-#     "1"=>["F", "E"],
-#     "2"=>["B", "C", "H"],
-#     "3"=>["A", "A", "D"],
-#     "4"=>["B"],
-#     "5"=>["A"]}
+  .map { |k, vs| "(#{vs.map(&:last).join(" ")})" }
+  .join(" ")
+# => "(L) (E F) (B C H) (D A)"
