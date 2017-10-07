@@ -1,4 +1,12 @@
+# * cursor / looping for a maybe smarter history building
+# * are git repos deep or wide?
+# * tag publishing events
+# * stack variables for declaring current user?
+# * pggitignore for generated data
+# * found or smth to get the row just inserted (how does ARB adapter do it?)
+
 require 'pg'
+require 'pp'
 
 # Reset the database
 lambda do
@@ -23,10 +31,10 @@ db.exec <<-SQL
   CREATE TABLE commits (
     id serial primary key,
     author_id int,
-    description varchar,
-    details text
-    -- created_at timestamp,
-    -- committed_at timestamp,
+    description varchar default '',
+    details text default '',
+    created_at timestamp default now(),
+    committed_at timestamp
   );
 SQL
 
@@ -45,29 +53,40 @@ db.exec <<-SQL
   CREATE TABLE branches (
     name varchar primary key,
     commit_id int,
-    -- created_at timestamp,
+    created_at timestamp default now(),
     creator_id int -- a user
   );
 SQL
 
-# Delta: a change to the data
+# Deltas: connect a commit to its changes
 db.exec <<-SQL
   CREATE TYPE delta_type AS ENUM (
-    'delete_table',
-    'create_table',
-    'drop_column',
-    'add_column',
-    'delete_row',
-    'insert_row',
-    'modify_cell'
+    'table',
+    'column',
+    'row',
+    'cell'
   );
   CREATE TABLE deltas (
+    type delta_type,
     commit_id int,
+    delta_id int
+  );
+
+  CREATE TYPE create_delete_modify AS ENUM (
+    'delete', 'create', 'modify'
+  );
+  CREATE TABLE deltas_for_tables (
+    id serial primary key,
+    type create_delete_modify,
+    table_name varchar
+  );
+  CREATE TABLE deltas_for_columns (
+    id serial primary key,
+    type create_delete_modify,
     table_name varchar,
     column_name varchar,
-    row_id integer,
-    type delta_type
-  )
+    column_type text
+  );
 SQL
 
 
@@ -101,36 +120,38 @@ end
 
 # Initial version control data
 # system user
-db.exec_params 'INSERT INTO users (username) VALUES ($1);', ['system']
-system_user = db.exec('SELECT * FROM users;').first
+system_user = db.exec_params(<<-SQL, ['system']).first
+  INSERT INTO users (username) VALUES ($1) RETURNING *;
+SQL
 
 # root commit
-db.exec_params 'INSERT INTO commits (author_id, description, details) VALUES ($1, $2, $3);', [
-  system_user['id'], 'Root Commit', 'The parent commit that all future commits will be based off of'
-]
-root_commit = db.exec_params('SELECT * from commits;').first
+root_commit = db.exec_params(
+  'INSERT INTO commits (author_id, description, details, committed_at) VALUES ($1, $2, $3, now()) RETURNING *;',
+  [ system_user['id'],
+    'Root Commit',
+    'The parent commit that all future commits will be based off of'
+  ]
+).first
 
 # trunk branch
-db.exec_params 'INSERT INTO branches (name, commit_id, creator_id) VALUES ($1, $2, $3)', [
-  'trunk', root_commit['id'], system_user['id']
-]
-trunk_branch = db.exec('SELECT * FROM branches;').first
-# => {"name"=>"trunk", "commit_id"=>"1", "creator_id"=>"1"}
+trunk_branch = db.exec_params(
+  'INSERT INTO branches (name, commit_id, creator_id) VALUES ($1, $2, $3) RETURNING *',
+  ['trunk', root_commit['id'], system_user['id']]
+).first
 
 # the system user is on the trunk branch
-db.exec 'UPDATE users SET branch_name = $1 WHERE id = $2', [
-  trunk_branch['name'], # => "trunk"
-  system_user['id']     # => "1"
-]
-system_user = db.exec('SELECT * FROM users;').first
+system_user = db.exec(<<-SQL, [trunk_branch['name'], system_user['id']]).first
+  UPDATE users SET branch_name = $1 WHERE id = $2 RETURNING *;
+SQL
+
 db.exec('SELECT * FROM users;').to_a # => [{"id"=>"1", "username"=>"system", "branch_name"=>"trunk"}]
-db.exec('SELECT * FROM commits;').to_a # => [{"id"=>"1", "author_id"=>"1", "description"=>"Root Commit", "details"=>"The parent commit that all future commits will be based off of"}]
-db.exec('SELECT * FROM branches;').to_a # => [{"name"=>"trunk", "commit_id"=>"1", "creator_id"=>"1"}]
+db.exec('SELECT * FROM commits;').to_a # => [{"id"=>"1", "author_id"=>"1", "description"=>"Root Commit", "details"=>"The parent commit that all future commits will be based off of", "created_at"=>"2017-10-06 20:39:01.795668", "committed_at"=>"2017-10-06 20:39:01.795668"}]
+db.exec('SELECT * FROM branches;').to_a # => [{"name"=>"trunk", "commit_id"=>"1", "created_at"=>"2017-10-06 20:39:01.796488", "creator_id"=>"1"}]
 
 # A lib so that I can have some abstractions
 class PgGit
   def initialize(db, user_id)
-    self.db   = db
+    self.db = db
     set_user user_id
   end
 
@@ -163,6 +184,49 @@ class PgGit
     set_user user.id
   end
 
+  def commit
+    first 'SELECT * FROM commits WHERE id = $1', branch.commit_id
+  end
+
+  def tables
+    # lineage()
+  end
+
+  def create_table(name, columns)
+    # make sure we're on an open commit
+    commit = commit()
+    if commit.committed_at
+      execute 'INSERT INTO commits (author_id) VALUES ($1)', user.id
+      commit = first('SELECT * FROM commits ORDER BY created_at DESC LIMIT 1')
+      execute 'UPDATE branches SET commit_id = $1 WHERE name = $2', commit.id, branch.name
+    end
+
+    # create the table
+    table_delta = first <<~SQL, 'create', name
+      INSERT INTO deltas_for_tables (type, table_name)
+      VALUES ($1, $2)
+      RETURNING *;
+    SQL
+
+    execute 'INSERT INTO deltas (type, commit_id, delta_id) VALUES ($1, $2, $3)',
+            'table', commit.id, table_delta.id
+
+    # create the columns
+    columns.each do |column_name, column_type|
+      column_delta = first <<~SQL, 'create', name, column_name, column_type
+        INSERT INTO deltas_for_columns (type, table_name, column_name, column_type)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *;
+      SQL
+
+      execute 'INSERT INTO deltas (type, commit_id, delta_id) VALUES ($1, $2, $3)',
+              'column', commit.id, column_delta.id
+    end
+
+    # FIXME: NEXT UP:
+    # QUERY THE DATA BACK OUT AND THEN CREATE IT IN THE SCHEMA!!
+  end
+
   private
 
   attr_accessor :db, :user
@@ -176,7 +240,6 @@ class PgGit
   end
 
   def execute(sql, *variables)
-    # sql %= variables.keys.map.with_index(1) { |var, i| [var, "$#{i}"] }.to_h # ~> ArgumentError: malformed format string - %'
     db.exec_params(sql, variables)
   end
 
@@ -197,10 +260,19 @@ class PgGit
       super
     end
     def inspect
-      "#<Result#{@hash.inspect}>"
+      PP.pp(self, '')
+    end
+    def pretty_print(pp)
+      pp.group 2, "#<Result", '>' do
+        @hash.each.with_index do |(k, v), i|
+          pp.breakable ' '
+          pp.text "#{k}=#{v.inspect}"
+        end
+      end
     end
   end
 end
+
 
 
 
@@ -215,17 +287,17 @@ pggit.schemas.map(&:schema_name) # => ["branch_first_changes"]
 pggit.branches.map(&:name)       # => ["trunk", "first_changes"]
 
 # switch to the branch
-pggit.branch                     # => #<Result{:name=>"trunk", :commit_id=>"1", :creator_id=>"1"}>
+pggit.branch                     # => #<Result\n  name="trunk"\n  commit_id="1"\n  created_at="2017-10-06 20:39:01.796488"\n  creator_id="1">\n
 pggit.switch_branch 'first_changes'
-pggit.branch                     # => #<Result{:name=>"first_changes", :commit_id=>"1", :creator_id=>"1"}>
+pggit.branch                     # => #<Result\n  name="first_changes"\n  commit_id="1"\n  created_at="2017-10-06 20:39:01.801439"\n  creator_id="1">\n
 
 # create the table
-pggit.tables # => NoMethodError: undefined method `tables' for #<PgGit:0x007fe4c503f820>
-pggit.commit # =>
+pggit.tables # => nil
+pggit.commit # => #<Result\n  id="1"\n  author_id="1"\n  description="Root Commit"\n  details="The parent commit that all future commits will be based off of"\n  created_at="2017-10-06 20:39:01.795668"\n  committed_at="2017-10-06 20:39:01.795668">\n
 pggit.create_table 'users', name: 'varchar', is_admin: 'boolean'
-pggit.tables # =>
-pggit.commit # =>
-pggit.commit! description: 'Create users table', details: "so we have somethign to play with"
+pggit.tables # => nil
+pggit.commit # => #<Result\n  id="2"\n  author_id="1"\n  description=""\n  details=""\n  created_at="2017-10-06 20:39:01.807536"\n  committed_at=nil>\n
+pggit.commit! description: 'Create users table', details: "so we have somethign to play with" # ~> NoMethodError: undefined method `commit!' for #<PgGit:0x007fa0108c5278>\nDid you mean?  commit
 pggit.commit # =>
 
 pggit.commit # =>
@@ -235,6 +307,7 @@ pggit.commit # =>
 pggit.tables # =>
 
 # ~> NoMethodError
-# ~> undefined method `tables' for #<PgGit:0x007fe4c503f820>
+# ~> undefined method `commit!' for #<PgGit:0x007fa0108c5278>
+# ~> Did you mean?  commit
 # ~>
-# ~> /Users/xjxc322/gamut/pg_version_control_experiment/experiments/implementation.rb:223:in `<main>'
+# ~> /Users/xjxc322/gamut/pg_version_control_experiment/experiments/implementation.rb:300:in `<main>'
