@@ -81,23 +81,39 @@ SQL
 
 # functions
 db.exec <<-SQL
-  create or replace function set_user(in id integer, out return_id integer)
+  create or replace function set_user(integer)
   returns integer as $$
+    select set_config('pg_git.current_user_id', $1::varchar, true)::integer;
+  $$ language sql;
+
+  create or replace function get_user_id()
+  returns integer as $$
+    select current_setting('pg_git.current_user_id')::integer;
+  $$ language sql;
+
+  create or replace function get_user()
+  returns users as $$
+    select * from users where id = get_user_id() limit 1;
+  $$ language sql;
+
+  create or replace function get_branch(out branch branches)
+  returns branches as $$
   begin
-    select set_config('pg_git.current_user_id', id::varchar, 'true')
-    into return_id;
+    select *
+    from branches
+    join get_user() on (branches.id = branch_id)
+    into branch
+    limit 1;
   end
   $$ language plpgsql;
 
-  create or replace function current_user_id(out return_id integer)
+  create or replace function get_branch_id()
   returns integer as $$
-  begin
-    select current_setting('pg_git.current_user_id') into return_id;
-  end
-  $$ language plpgsql;
+    select id from get_branch();
+  $$ language sql;
 
   create or replace function initial_setup()
-  returns varchar as $$
+  returns record as $$
   declare
     myuser users;
     mycommit commits;
@@ -110,15 +126,16 @@ db.exec <<-SQL
 
     -- create the commit --
     insert into commits (author_id, description, details, committed_at, database_hash)
-      values (current_user_id(), 'Initial commit', 'Initial commit', now(), '--------------------------------')
+      values (get_user_id(), 'Initial commit', 'Initial commit', now(), '--------------------------------')
       returning * into mycommit;
 
     -- create the branch --
     insert into branches (name, commit_id, creator_id)
-      values ('primary', mycommit.id, current_user_id());
+      values ('primary', mycommit.id, get_user_id());
 
     -- select current_setting('pg_git.current_user_id') into userid;
-    return current_user_id();
+    -- return get_user_id();
+    return get_branch();
   end
   $$ language plpgsql;
 SQL
@@ -137,11 +154,11 @@ SQL
 
 
 # db.exec('select set_user(1);').to_a # => [{"set_user"=>"1"}]
-db.exec('select initial_setup();').to_a # => [{"initial_setup"=>"1"}]
+db.exec('select initial_setup();').to_a # => [{"initial_setup"=>"(1,primary,1,\"2017-10-09 14:58:37.939846\",1)"}]
 db.exec('select * from users;').to_a    # => [{"id"=>"1", "username"=>"system", "branch_id"=>"1"}]
-db.exec('select * from branches;').to_a # => [{"id"=>"1", "name"=>"primary", "commit_id"=>"1", "created_at"=>"2017-10-09 14:30:24.33138", "creator_id"=>"1"}]
+db.exec('select * from branches;').to_a # => [{"id"=>"1", "name"=>"primary", "commit_id"=>"1", "created_at"=>"2017-10-09 14:58:37.939846", "creator_id"=>"1"}]
 db.exec('select * from ancestry;').to_a # => []
-db.exec('select * from commits;').to_a  # => [{"id"=>"1", "author_id"=>"1", "description"=>"Initial commit", "details"=>"Initial commit", "created_at"=>"2017-10-09 14:30:24.33138", "committed_at"=>"2017-10-09 14:30:24.33138", "database_hash"=>"--------------------------------"}]
+db.exec('select * from commits;').to_a  # => [{"id"=>"1", "author_id"=>"1", "description"=>"Initial commit", "details"=>"Initial commit", "created_at"=>"2017-10-09 14:58:37.939846", "committed_at"=>"2017-10-09 14:58:37.939846", "database_hash"=>"--------------------------------"}]
 db.exec('select * from pg_git_objects').to_a
 # => []
 
