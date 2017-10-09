@@ -1,7 +1,7 @@
 # A branch is a pointer to a commit
 # A commit is a hashed database, author, commit message, and date
 # A database is a hashed list of tables
-# A table is a hashed structure and list of rows (or row sets as an optimization detail?)
+# A table is a name, hashed structure and list of rows (or row sets as an optimization detail?)
 # A table structure is a hashed list of columns
 # A a column is a name and hashed type
 # A type is a postgresql type and modifiers
@@ -18,67 +18,154 @@
 # To build an arbitrary database state, rebuild by looking up the pieces based on their hashes
 
 
-# Reset and connect to the database
+# =====  Reset and connect to the database  =====
 require 'pg'
 db = PG.connect(dbname: 'postgres')
 db.exec("DROP DATABASE IF EXISTS pg_git;")
 db.exec("CREATE DATABASE pg_git;")
 db = PG.connect dbname: 'pg_git'
 
-# The tables
+# =====  The tables  =====
+hash = "varchar(32)" # size of md5
 db.exec <<-SQL
-  CREATE TABLE users (
-    id        serial primary key,
-    username  varchar,
-    branch_id int default 1 -- 1 is the id of the primary branch
+  create type pg_git_type as enum (
+    'database',
+    'table'
+  );
+  create table pg_git_objects (
+    hash #{hash} primary key,
+    type pg_git_type
+  );
+  create table pg_git_object_databases (
+    hash #{hash} primary key
+  );
+  create table pg_git_object_database_tables (
+    database_hash #{hash},
+    table_hash    #{hash}
+  );
+  create table pg_git_object_tables (
+    hash #{hash} primary key,
+    name varchar
   );
   -- Commit: a group of changes (deltas)
-  CREATE TABLE commits (
-    id           serial primary key,
-    author_id    int,
-    description  varchar default '',
-    details      text default '',
-    created_at   timestamp default now(),
-    committed_at timestamp,
-    database:
+  create table commits (
+    id            serial primary key,
+    author_id     int,
+    description   varchar default '',
+    details       text default '',
+    created_at    timestamp default now(),
+    committed_at  timestamp,
+    database_hash #{hash}
   );
   -- Ancestry: relationship between commits
-  CREATE TABLE ancestry (
+  create table ancestry (
     parent_id int,
     child_id  int
   );
   -- Branch: a name for a commit
   -- these will be used to track which commits we are interested in viewing and editing
   -- eg branches will be cached, where commits won't, because there would be too many of them
-  CREATE TABLE branches (
+  create table branches (
     id         serial primary key,
     name       varchar,
     commit_id  int,
     created_at timestamp default now(),
     creator_id int -- a user
   );
+  create table users (
+    id        serial primary key,
+    username  varchar,
+    branch_id int default 1 -- 1 is the id of the primary branch
+  );
 SQL
 
+# functions
+db.exec <<-SQL
+  create or replace function set_user(in id integer, out return_id integer)
+  returns integer as $$
+  begin
+    select set_config('pg_git.current_user_id', id::varchar, 'true')
+    into return_id;
+  end
+  $$ language plpgsql;
+
+  create or replace function current_user_id(out return_id integer)
+  returns integer as $$
+  begin
+    select current_setting('pg_git.current_user_id') into return_id;
+  end
+  $$ language plpgsql;
+
+  create or replace function initial_setup()
+  returns varchar as $$
+  declare
+    myuser users;
+    mycommit commits;
+  begin
+    -- create the system user --
+    insert into users (username)
+      values ('system')
+      returning * into myuser;
+    perform set_user(myuser.id);
+
+    -- create the commit --
+    insert into commits (author_id, description, details, committed_at, database_hash)
+      values (current_user_id(), 'Initial commit', 'Initial commit', now(), '--------------------------------')
+      returning * into mycommit;
+
+    -- create the branch --
+    insert into branches (name, commit_id, creator_id)
+      values ('primary', mycommit.id, current_user_id());
+
+    -- select current_setting('pg_git.current_user_id') into userid;
+    return current_user_id();
+  end
+  $$ language plpgsql;
+SQL
+
+
+
 (db.exec "select table_name from information_schema.tables where table_schema = 'public'").to_a
-# => [{"table_name"=>"users"},
+# => [{"table_name"=>"pg_git_objects"},
+#     {"table_name"=>"pg_git_object_databases"},
+#     {"table_name"=>"pg_git_object_database_tables"},
+#     {"table_name"=>"pg_git_object_tables"},
 #     {"table_name"=>"commits"},
 #     {"table_name"=>"ancestry"},
-#     {"table_name"=>"branches"}]
+#     {"table_name"=>"branches"},
+#     {"table_name"=>"users"}]
 
+
+# db.exec('select set_user(1);').to_a # => [{"set_user"=>"1"}]
+db.exec('select initial_setup();').to_a # => [{"initial_setup"=>"1"}]
+db.exec('select * from users;').to_a    # => [{"id"=>"1", "username"=>"system", "branch_id"=>"1"}]
+db.exec('select * from branches;').to_a # => [{"id"=>"1", "name"=>"primary", "commit_id"=>"1", "created_at"=>"2017-10-09 14:30:24.33138", "creator_id"=>"1"}]
+db.exec('select * from ancestry;').to_a # => []
+db.exec('select * from commits;').to_a  # => [{"id"=>"1", "author_id"=>"1", "description"=>"Initial commit", "details"=>"Initial commit", "created_at"=>"2017-10-09 14:30:24.33138", "committed_at"=>"2017-10-09 14:30:24.33138", "database_hash"=>"--------------------------------"}]
+db.exec('select * from pg_git_objects').to_a
+# => []
 
 __END__
-# Initial version control data
+# =====  Initial version control data  =====
 # system user
 system_user = db.exec_params(<<-SQL, ['system']).first
   INSERT INTO users (username) VALUES ($1) RETURNING *;
 SQL
 
+# empty database
+empty_database = db.exec_params(
+ 'INSERT INTO pg_git_object_databases (hash) VALUES ($1) returning *;',
+ [hash('database')]
+)
+
 # root commit
 root_commit = db.exec_params(
-  'INSERT INTO commits (author_id, description, details, committed_at) VALUES ($1, $2, $3, now()) RETURNING *;',
+  'INSERT INTO commits (author_id, description, details, committed_at, database_hash) VALUES ($1, $2, $3, now()) RETURNING *;',
   [ system_user['id'],
     'Root Commit',
-    'The parent commit that all future commits will be based off of'
+    'The parent commit that all future commits will be based off of',
+    'now()',
+    empty_database['hash'],
   ]
 ).first
 
@@ -89,13 +176,13 @@ trunk_branch = db.exec_params(
 ).first
 
 # the system user is on the trunk branch
-system_user = db.exec(<<-SQL, [trunk_branch['name'], system_user['id']]).first
+system_user = db.exec(<<-SQL, [trunk_branch['name'], system_user['id']]).first # ~> PG::UndefinedColumn: ERROR:  column "branch_name" of relation "users" does not exist\nLINE 1:   UPDATE users SET branch_name = $1 WHERE id = $2 RETURNING ...\n                           ^\n
   UPDATE users SET branch_name = $1 WHERE id = $2 RETURNING *;
 SQL
 
-db.exec('SELECT * FROM users;').to_a # => [{"id"=>"1", "username"=>"system", "branch_name"=>"trunk"}]
-db.exec('SELECT * FROM commits;').to_a # => [{"id"=>"1", "author_id"=>"1", "description"=>"Root Commit", "details"=>"The parent commit that all future commits will be based off of", "created_at"=>"2017-10-06 20:39:01.795668", "committed_at"=>"2017-10-06 20:39:01.795668"}]
-db.exec('SELECT * FROM branches;').to_a # => [{"name"=>"trunk", "commit_id"=>"1", "created_at"=>"2017-10-06 20:39:01.796488", "creator_id"=>"1"}]
+db.exec('SELECT * FROM users;').to_a # =>
+db.exec('SELECT * FROM commits;').to_a # =>
+db.exec('SELECT * FROM branches;').to_a # =>
 
 # A lib so that I can have some abstractions
 class PgGit
@@ -229,24 +316,24 @@ end
 pggit = PgGit.new db, system_user['id']
 
 # make a branch
-pggit.schemas.map(&:schema_name) # => []
-pggit.branches.map(&:name)       # => ["trunk"]
+pggit.schemas.map(&:schema_name) # =>
+pggit.branches.map(&:name)       # =>
 pggit.create_branch 'first_changes'
-pggit.schemas.map(&:schema_name) # => ["branch_first_changes"]
-pggit.branches.map(&:name)       # => ["trunk", "first_changes"]
+pggit.schemas.map(&:schema_name) # =>
+pggit.branches.map(&:name)       # =>
 
 # switch to the branch
-pggit.branch                     # => #<Result\n  name="trunk"\n  commit_id="1"\n  created_at="2017-10-06 20:39:01.796488"\n  creator_id="1">\n
+pggit.branch                     # =>
 pggit.switch_branch 'first_changes'
-pggit.branch                     # => #<Result\n  name="first_changes"\n  commit_id="1"\n  created_at="2017-10-06 20:39:01.801439"\n  creator_id="1">\n
+pggit.branch                     # =>
 
 # create the table
-pggit.tables # => nil
-pggit.commit # => #<Result\n  id="1"\n  author_id="1"\n  description="Root Commit"\n  details="The parent commit that all future commits will be based off of"\n  created_at="2017-10-06 20:39:01.795668"\n  committed_at="2017-10-06 20:39:01.795668">\n
+pggit.tables # =>
+pggit.commit # =>
 pggit.create_table 'users', name: 'varchar', is_admin: 'boolean'
-pggit.tables # => nil
-pggit.commit # => #<Result\n  id="2"\n  author_id="1"\n  description=""\n  details=""\n  created_at="2017-10-06 20:39:01.807536"\n  committed_at=nil>\n
-pggit.commit! description: 'Create users table', details: "so we have somethign to play with" # ~> NoMethodError: undefined method `commit!' for #<PgGit:0x007fa0108c5278>\nDid you mean?  commit
+pggit.tables # =>
+pggit.commit # =>
+pggit.commit! description: 'Create users table', details: "so we have somethign to play with"
 pggit.commit # =>
 
 pggit.commit # =>
@@ -255,8 +342,10 @@ pggit.switch_branch 'root'
 pggit.commit # =>
 pggit.tables # =>
 
-# ~> NoMethodError
-# ~> undefined method `commit!' for #<PgGit:0x007fa0108c5278>
-# ~> Did you mean?  commit
+# ~> PG::UndefinedColumn
+# ~> ERROR:  column "branch_name" of relation "users" does not exist
+# ~> LINE 1:   UPDATE users SET branch_name = $1 WHERE id = $2 RETURNING ...
+# ~>                            ^
 # ~>
-# ~> /Users/xjxc322/gamut/pg_version_control_experiment/experiments/implementation.rb:300:in `<main>'
+# ~> /Users/xjxc322/gamut/pg_version_control_experiment/experiments/implementation_store_cached_state_not_diffs.rb:109:in `exec'
+# ~> /Users/xjxc322/gamut/pg_version_control_experiment/experiments/implementation_store_cached_state_not_diffs.rb:109:in `<main>'
