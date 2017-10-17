@@ -74,11 +74,13 @@ extend Assertions
 # The values being stored (going to use their id as the value)
 db.exec <<-SQL
   -- version control tables
+  create extension hstore;
   create schema version_control;
   set search_path = version_control;
   create table rows (
-    vc_hash character(32),
-    row     text
+    vc_hash    character(32),
+    tbl        varchar,
+    row_data   public.hstore
   );
 
   -- the branch (tables we want to put into version control)
@@ -91,41 +93,26 @@ db.exec <<-SQL
   );
 
   -- triggers to calculate the hash
-  create or replace function vc_set_hash()
+  create or replace function vc_hash_and_record()
   returns trigger as $$
+  declare
+    recorded   version_control.rows;
+    serialized hstore;
   begin
-    -- When a cast is applied to a value expression of a known type, it represents a run-time type conversion.
-    -- :/ means that the memory format would be lost, and values of different types can get conflated
     NEW.vc_hash = null;
-    NEW.vc_hash = md5(NEW::text);
-    return NEW;
-  end $$ language plpgsql;
+    select hstore(NEW) into serialized;
+    NEW.vc_hash = md5(serialized::text);
 
-  create trigger vc_set_hash_insert_tg
-    before insert on branch1.products
-    for each row execute procedure vc_set_hash();
-
-  create trigger vc_set_hash_update_tg
-    before update on branch1.products
-    for each row execute procedure vc_set_hash();
-
-  -- trigger to record the insertion
-  create or replace function vc_record_row()
-  returns trigger as $$
-  begin
-    insert into version_control.rows (vc_hash)
-    select NEW.vc_hash
+    insert into version_control.rows (vc_hash, tbl, row_data)
+    select NEW.vc_hash, TG_TABLE_NAME, serialized
     where not exists (select vc_hash from version_control.rows where vc_hash = NEW.vc_hash);
+
     return NEW;
   end $$ language plpgsql;
 
-  create trigger vc_record_row_insert_tg
-    after insert on branch1.products
-    for each row execute procedure vc_record_row();
-
-  create trigger vc_record_row_update_tg
-    after update on branch1.products
-    for each row execute procedure vc_record_row();
+  create trigger vc_hash_and_record_tg
+    before insert or update on branch1.products
+    for each row execute procedure vc_hash_and_record();
 SQL
 
 
@@ -142,7 +129,7 @@ assert_equal products.map { |p| [p.id, p.name] },
              [['1', 'product 1'], ['2', 'product 2']]
 
 refute_equal *products.map(&:vc_hash), 'Hashes differ for different data'
-# => ["09707231f1c9f3b821fa24aa72657522", "42a4509accac1698664eae3843d0a473"]
+# => ["9eaeba201e14817d2a06b7e9ebc10fb9", "d0025370dea0817b3cb818cfb31be348"]
 
 # rows are recorded
 vc_rows = db.exec 'select * from version_control.rows'
@@ -158,9 +145,9 @@ assert_equal products_mod.map { |p| [p.id, p.name] },
              [['1', 'product 1 modified'], ['2', 'product 2']]
 
 refute_equal products[0].vc_hash, products_mod[0].vc_hash
-# => ["09707231f1c9f3b821fa24aa72657522", "aadfb0ab48a388e90741fdcc59c4a00e"]
+# => ["9eaeba201e14817d2a06b7e9ebc10fb9", "0c702a961e7ea54327d5236549755cec"]
 assert_equal products[1].vc_hash, products_mod[1].vc_hash
-# => "42a4509accac1698664eae3843d0a473"
+# => "d0025370dea0817b3cb818cfb31be348"
 
 # updated row is recorded, originals are still there
 all_hashes  = [*vc_rows, products_mod[0]].map(&:vc_hash)
@@ -178,6 +165,17 @@ assert_equal products, products_unmod
 # rows are not recorded, b/c they already exist
 vc_rows_unmod = db.exec 'select * from version_control.rows'
 assert_equal all_hashes.sort, vc_rows_unmod.map(&:vc_hash).sort
-# => ["09707231f1c9f3b821fa24aa72657522",
-#     "42a4509accac1698664eae3843d0a473",
-#     "aadfb0ab48a388e90741fdcc59c4a00e"]
+
+vc_rows_unmod
+# => [#<Record
+#       vc_hash="9eaeba201e14817d2a06b7e9ebc10fb9"
+#       tbl="products"
+#       row_data="\"id\"=>\"1\", \"name\"=>\"product 1\", \"vc_hash\"=>NULL">,
+#     #<Record
+#       vc_hash="d0025370dea0817b3cb818cfb31be348"
+#       tbl="products"
+#       row_data="\"id\"=>\"2\", \"name\"=>\"product 2\", \"vc_hash\"=>NULL">,
+#     #<Record
+#       vc_hash="0c702a961e7ea54327d5236549755cec"
+#       tbl="products"
+#       row_data="\"id\"=>\"1\", \"name\"=>\"product 1 modified\", \"vc_hash\"=>NULL">]
