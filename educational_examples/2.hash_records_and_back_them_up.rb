@@ -17,7 +17,7 @@ sql <<~SQL
     vc_hash character(32)
   );
 
-  -- triggers to calculate the hash
+  -- triggers to calculate the hash and store the record in version control
   create or replace function vc_hash_and_record()
   returns trigger as $$
   declare

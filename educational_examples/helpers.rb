@@ -11,7 +11,7 @@ def db
 end
 
 # A convenience method to wrap database calls
-def sql(sql, *params)
+def sql(sql, *params, db: $db)
   # the rules are different when you do / don't have params
   # so use the normal `exec`, when possible
   if params.empty?
@@ -20,6 +20,9 @@ def sql(sql, *params)
     db.exec_params sql, params
   end.map { |row| Record.new row }
 end
+
+# A convenience wrapper so you can call sql by wrapping a heredoc in backticks
+alias ` sql
 
 
 # Wraps a database record result (hash of strings) in a convenience class
