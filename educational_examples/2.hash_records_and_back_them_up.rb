@@ -11,6 +11,7 @@ sql <<~SQL
     data    hstore
   );
 
+  -- record changes to this table
   create table products (
     id      serial primary key,
     name    varchar,
