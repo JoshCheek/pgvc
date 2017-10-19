@@ -80,19 +80,19 @@ sql <<~SQL
 SQL
 
 
-def commit_users
+def commit
   sql("select commit_table('users') as vc_hash").first.vc_hash
 end
 
-empty = commit_users
+EMPTY = commit
 sql "insert into users (name) values ('Yumin'), ('Gomez')"
-yg = commit_users
+YG = commit
 sql "insert into users (name) values ('Anca')"
-yga = commit_users
+YGA = commit
 sql "delete from users where name = 'Gomez'"
-ya = commit_users
+YA = commit
 sql "update users set name = 'Yooms' where name = 'Yumin'"
-y2a = commit_users
+Y2A = commit
 
 
 def checkout(table_hash)
@@ -100,8 +100,8 @@ def checkout(table_hash)
   sql("select name from users order by id").map(&:name)
 end
 
-eq! %w[],                 checkout(empty)
-eq! %w[Yumin Gomez],      checkout(yg)
-eq! %w[Yumin Gomez Anca], checkout(yga)
-eq! %w[Yumin Anca],       checkout(ya)
-eq! %w[Yooms Anca],       checkout(y2a)
+eq! %w[],                 checkout(EMPTY)
+eq! %w[Yumin Gomez],      checkout(YG)
+eq! %w[Yumin Gomez Anca], checkout(YGA)
+eq! %w[Yumin Anca],       checkout(YA)
+eq! %w[Yooms Anca],       checkout(Y2A)

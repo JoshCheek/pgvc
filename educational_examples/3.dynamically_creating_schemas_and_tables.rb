@@ -2,11 +2,10 @@
 require_relative 'helpers'
 
 sql <<~SQL
-  create table vc_schemas (name varchar);
-  create table vc_tables  (name varchar);
+  create table vc_tracked_tables (name varchar);
 
   -- two tables to add to a schema
-  insert into vc_tables (name) values ('products'), ('users');
+  insert into vc_tracked_tables (name) values ('products'), ('users');
 
   create table products (
     id   serial primary key,
@@ -19,17 +18,16 @@ sql <<~SQL
   );
 
 
-  -- now add them
+  -- The function to add them, "checkout" in git-speak
   create function checkout(in schema_name varchar)
   returns void as $$
   declare
     table_name varchar;
   begin
-    insert into vc_schemas (name) values (schema_name);
     execute format('create schema %s', quote_ident(schema_name));
 
     for table_name in
-      select name from vc_tables
+      select name from vc_tracked_tables
     loop
       execute format(
         'create table %s.%s (like public.%s including all);',
@@ -40,15 +38,11 @@ sql <<~SQL
     end loop;
   end
   $$ language plpgsql;
-  SQL
+SQL
 
 
-# "checkout" the schema (in git-speak)
+# "checkout" the schema
   sql "select checkout('mahschema');"
-
-# it was saved in the list of schemas we're tracking
-  sql "select * from vc_schemas"
-  # => [#<Record name='mahschema'>]
 
 # it was created
   sql "select catalog_name, schema_name from information_schema.schemata where schema_name = 'mahschema';"

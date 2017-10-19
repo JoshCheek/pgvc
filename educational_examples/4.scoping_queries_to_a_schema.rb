@@ -16,7 +16,7 @@ sql <<~SQL
   insert into first.users  (name) VALUES ('Josh');
   insert into second.users (name) VALUES ('Ashton');
   insert into third.users  (name) VALUES ('Yumin');
-  SQL
+SQL
 
 # Three connections
 name = $db.conninfo_hash[:dbname]
