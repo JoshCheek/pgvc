@@ -1,4 +1,4 @@
-# Dynamically creating tables in schemas
+# Dynamically creating schemas and populating them with tables
 require_relative 'helpers'
 
 sql <<~SQL
@@ -48,12 +48,12 @@ sql <<~SQL
 
 # it was saved in the list of schemas we're tracking
   sql "select * from vc_schemas"
-  # => [#<Record name="mahschema">]
+  # => [#<Record name='mahschema'>]
 
 # it was created
   sql "select catalog_name, schema_name from information_schema.schemata where schema_name = 'mahschema';"
-  # => [#<Record catalog_name="pg_git" schema_name="mahschema">]
+  # => [#<Record catalog_name='pg_git' schema_name='mahschema'>]
 
 # tbe table was created
   sql "select table_name from information_schema.tables where table_schema = 'mahschema';"
-  # => [#<Record table_name="products">, #<Record table_name="users">]
+  # => [#<Record table_name='products'>, #<Record table_name='users'>]

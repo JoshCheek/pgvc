@@ -29,7 +29,7 @@ require_relative 'helpers'
     values ('Josh'), ('Ashton')
     returning *;
   SQL
-  # => [#<Record id="1" name="Josh">, #<Record id="2" name="Ashton">]
+  # => [#<Record id='1' name='Josh'>, #<Record id='2' name='Ashton'>]
 
 
 # Save the users to version control
@@ -39,8 +39,8 @@ require_relative 'helpers'
     from users
     returning *;
   SQL
-  # => [#<Record id="1" col_values="\"id\"=>\"1\", \"name\"=>\"Josh\"">,
-  #     #<Record id="2" col_values="\"id\"=>\"2\", \"name\"=>\"Ashton\"">]
+  # => [#<Record id='1' col_values='"id"=>"1", "name"=>"Josh"'>,
+  #     #<Record id='2' col_values='"id"=>"2", "name"=>"Ashton"'>]
 
 
 # Delete the users
@@ -58,5 +58,5 @@ require_relative 'helpers'
   SQL
 
 # They match!
-  assert_equal original, restored
-  # => [#<Record id="1" name="Josh">, #<Record id="2" name="Ashton">]
+  eq! original, restored
+  # => [#<Record id='1' name='Josh'>, #<Record id='2' name='Ashton'>]

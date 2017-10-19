@@ -30,6 +30,6 @@ sql "set search_path = 'second'", db: db2
 sql "set search_path = 'third'",  db: db3
 
 # And, when executing the query, each finds its associated record
-sql 'select * from users', db: db1 # => [#<Record name="Josh">]
-sql 'select * from users', db: db2 # => [#<Record name="Ashton">]
-sql 'select * from users', db: db3 # => [#<Record name="Yumin">]
+sql 'select * from users', db: db1 # => [#<Record name='Josh'>]
+sql 'select * from users', db: db2 # => [#<Record name='Ashton'>]
+sql 'select * from users', db: db3 # => [#<Record name='Yumin'>]

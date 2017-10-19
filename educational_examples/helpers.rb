@@ -59,6 +59,22 @@ class Record
 end
 
 
+class String
+  alias orig_inspect inspect
+  private :orig_inspect
+
+  # monkey patch to prefer single quotes, unless double quotes have less escaping
+  def inspect
+    double_quotes = orig_inspect
+    single_quotes = "'#{gsub "'", "\\\\'"}'"
+    if double_quotes.length < single_quotes.length
+      double_quotes
+    else
+      single_quotes
+    end
+  end
+end
+
 # Some assertions for verifying its behaviour without having to check output
 module Assertions
   def assert!(bool, message="failed assertion")
