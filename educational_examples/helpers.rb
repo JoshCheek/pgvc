@@ -21,9 +21,6 @@ def sql(sql, *params, db: $db)
   end.map { |row| Record.new row }
 end
 
-# A convenience wrapper so you can call sql by wrapping a heredoc in backticks
-alias ` sql
-
 
 # Wraps a database record result (hash of strings) in a convenience class
 class Record
@@ -50,12 +47,14 @@ class Record
     ::PP.pp(self, '').chomp
   end
   def pretty_print(pp)
-    pp.group 2, "#<Record", '>' do
+    pp.text "#<Record "
+    pp.group 9 do
       @hash.each.with_index do |(k, v), i|
-        pp.breakable ' '
         pp.text "#{k}=#{v.inspect}"
+        pp.breakable ' ' unless i == @hash.length-1
       end
     end
+    pp.text '>'
   end
 end
 
