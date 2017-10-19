@@ -3,60 +3,60 @@
 require_relative 'helpers'
 
 # Schema
-sql <<~SQL
-  -- This provides a hash-table type, keys and values are strings, it ships with postgresql
-  create extension hstore;
+  sql <<~SQL
+    -- This provides a hash-table type, keys and values are strings, it ships with postgresql
+    create extension hstore;
 
-  -- A BACKUP TABLE
-  -- Can store rows from arbitrary other tables. To generalize, store the name of
-  -- which table it's backing up. I've tested this with tables that hold booleans,
-  -- numbers, strings, composite types, enums, and hstores
-  create table backup (
-    id         serial primary key,
-    col_values hstore
-  );
+    -- VERSION CONTROLLED ROWS
+    -- Can store rows from any arbitrary table. To generalize this example, store the
+    -- name of the table it's backing up. I've tested this with tables that hold booleans,
+    -- numbers, strings, composite types, enums, ranges, and hstores (yes, it can nest them!)
+    create table vc_rows (
+      id         serial primary key,
+      col_values hstore
+    );
 
-  -- A TABLE WE WANT TO BACK UP
-  create table users (
-    id   serial primary key,
-    name varchar
-  );
+    -- A TABLE WE WANT TO BACK UP
+    create table users (
+      id   serial primary key,
+      name varchar
+    );
   SQL
 
 # Create some users
-original = sql <<~SQL
-  insert into users (name)
-  values ('Josh'), ('Sally')
-  returning *;
+  original = sql <<~SQL
+    insert into users (name)
+    values ('Josh'), ('Ashton')
+    returning *;
   SQL
-  # => [#<Record id="1" name="Josh">, #<Record id="2" name="Sally">]
+  # => [#<Record id="1" name="Josh">, #<Record id="2" name="Ashton">]
 
 
-# Back the users up
-sql <<~SQL
-  insert into backup (col_values)
-  select hstore(users)
-  from users
-  returning *;
+# Save the users to version control
+  sql <<~SQL
+    insert into vc_rows (col_values)
+    select hstore(users)
+    from users
+    returning *;
   SQL
   # => [#<Record id="1" col_values="\"id\"=>\"1\", \"name\"=>\"Josh\"">,
-  #     #<Record id="2" col_values="\"id\"=>\"2\", \"name\"=>\"Sally\"">]
+  #     #<Record id="2" col_values="\"id\"=>\"2\", \"name\"=>\"Ashton\"">]
 
 
 # Delete the users
-sql 'delete from users;'
-sql 'select * from users;'
+  sql 'delete from users;'
+  sql 'select * from users;'
   # => []
 
-# Restore them from the backup
-restored = sql <<~SQL
-  insert into users
-  select (populate_record(null::users, col_values)).*
-  from backup;
+# Restore the users from version control
+  restored = sql <<~SQL
+    insert into users
+    select (populate_record(null::users, col_values)).*
+    from vc_rows;
 
-  select * from users;
+    select * from users;
   SQL
 
 # They match!
-assert_equal original, restored
-  # => [#<Record id="1" name="Josh">, #<Record id="2" name="Sally">]
+  assert_equal original, restored
+  # => [#<Record id="1" name="Josh">, #<Record id="2" name="Ashton">]
