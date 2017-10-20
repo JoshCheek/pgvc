@@ -84,7 +84,7 @@ module Assertions
 
   alias_method :eq!, def assert_equal(e, a, message=nil)
     return a if e == a
-    fail_assertion "#{message&&message+"\n\n"}Expected #{e.inspect}\nTo Equal #{a.inspect}"
+    fail_assertion "#{message&&message+"\n\n"}Expected #{a.inspect}\nTo Equal #{e.inspect}"
   end
 
   alias_method :ne!, def refute_equal(ne, a, message=nil)

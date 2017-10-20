@@ -25,8 +25,7 @@ sql <<~SQL
 
 
   -- triggers to calculate the hash and store the record in version control
-  create or replace function vc_hash_and_record()
-  returns trigger as $$
+  create function vc_hash_and_record() returns void as $$
   declare
     serialized hstore;
   begin
@@ -46,26 +45,20 @@ sql <<~SQL
     for each row execute procedure vc_hash_and_record();
 
 
-  create function commit_table(in table_name varchar)
-  returns character(32) as $$
+  create function commit_table(in table_name varchar, out table_hash character(32)) as $$
   declare
     row_hashes character(32)[];
-    table_hash character(32);
   begin
     execute
       format('select array_agg(vc_hash) from users;', quote_ident(table_name))
       into row_hashes;
-    select md5(row_hashes::text)
-      into table_hash;
     insert into vc_tables (vc_hash, row_hashes)
-      values (table_hash, row_hashes);
-    return table_hash;
-  end
-  $$ language plpgsql;
+      values (md5(row_hashes::text), row_hashes)
+      returning vc_hash into table_hash;
+  end $$ language plpgsql;
 
 
-  create function checkout_table(in table_hash character(32))
-  returns void as $$
+  create function checkout_table(in table_hash character(32)) returns void as $$
   declare
     hashes character(32)[];
   begin
@@ -75,8 +68,7 @@ sql <<~SQL
       select (populate_record(null::users, data)).*
       from unnest(hashes) recorded_hash
       left join vc_rows on vc_hash = recorded_hash;
-  end
-  $$ language plpgsql
+  end $$ language plpgsql
 SQL
 
 
@@ -100,8 +92,8 @@ def checkout(table_hash)
   sql("select name from users order by id").map(&:name)
 end
 
-eq! %w[],                 checkout(EMPTY)
-eq! %w[Yumin Gomez],      checkout(YG)
-eq! %w[Yumin Gomez Anca], checkout(YGA)
-eq! %w[Yumin Anca],       checkout(YA)
-eq! %w[Yooms Anca],       checkout(Y2A)
+eq! %w[],                 checkout(EMPTY) # => []
+eq! %w[Yumin Gomez],      checkout(YG)    # => ['Yumin', 'Gomez']
+eq! %w[Yumin Gomez Anca], checkout(YGA)   # => ['Yumin', 'Gomez', 'Anca']
+eq! %w[Yumin Anca],       checkout(YA)    # => ['Yumin', 'Anca']
+eq! %w[Yooms Anca],       checkout(Y2A)   # => ['Yooms', 'Anca']
