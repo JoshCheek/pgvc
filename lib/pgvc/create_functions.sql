@@ -1,6 +1,5 @@
-create function vc.get_commit_hash(in c vc.commits) returns varchar(32) as $$
-begin
-  return md5(concat(
+create function vc.get_commit_hash(c vc.commits) returns varchar(32) as $$
+  select md5(concat(
     c.db_hash,
     c.user_id::text,
     c.description,
@@ -8,14 +7,12 @@ begin
     c.created_at::text,
     c.committed_at::text
   ));
-end $$ language plpgsql;
+$$ language sql;
 
 
 
-create function vc.initialize(
-    in system_user_id    integer,
-    in default_branchname varchar
-  ) returns void as $$
+create function vc.initialize(system_user_id integer, default_branchname varchar)
+returns void as $$
   declare
     root_commit    vc.commits;
     default_branch vc.branches;
@@ -41,47 +38,33 @@ create function vc.initialize(
   end $$ language plpgsql
   set search_path = vc;
 
-create function vc.get_branch(in userid integer) returns vc.branches as $$
-  declare
-    branch vc.branches;
-  begin
+
+create function vc.get_branch(user_id integer) returns vc.branches as $$
+    -- default for if the user has never checked out a branch
+    select * from vc.branches where is_default
+    union
+    -- FIXME: This hasn't been tested yet
     select branches.*
-      from user_branches ub
-      join branches on (ub.branch_id = branches.id)
-      where ub.user_id = userid -- FIXME: how do I specify the argument, rather than changing names to not conflict?
-      into branch
-      limit 1;
-    if branch.id is null then
-      select * from branches where is_default into branch;
-    end if;
-    return branch;
-  end $$ language plpgsql
-  set search_path = vc;
+      from vc.user_branches ub
+      join vc.branches on (ub.branch_id = branches.id)
+      where ub.user_id = $1
+  $$ language sql;
 
 
-create function vc.create_branch(in name varchar, in commit_hash character(32))
+create function vc.create_branch(name varchar, commit_hash character(32))
 returns vc.branches as $$
-  declare
-    branch branches;
-  begin
-    insert into vc.branches (commit_hash, name, schema_name, is_default)
-      values ( commit_hash, name, 'branch_'||quote_ident(name), false)
-      returning * into branch;
-    return branch;
-  end $$ language plpgsql set search_path = vc;
+  insert into vc.branches (commit_hash, name, schema_name, is_default)
+    values ( commit_hash, name, 'branch_'||quote_ident(name), false)
+    returning *;
+  $$ language sql;
 
 
-create function vc.get_commit(in hash character(32))
-  returns vc.commits as $$
-  declare
-    c vc.commits;
-  begin
-    select * from vc.commits where vc_hash = hash into c;
-    return c;
-  end $$ language plpgsql;
+create function vc.get_commit(commit_hash character(32)) returns vc.commits as $$
+  select * from vc.commits where vc_hash = commit_hash
+  $$ language sql;
 
-create function vc.track_table(in tblname varchar)
-  returns void as $$
+
+create function vc.track_table(tblname varchar) returns void as $$
   begin
     insert into tracked_tables (name) values (tblname)
       on conflict do nothing;

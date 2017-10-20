@@ -24,11 +24,13 @@ RSpec.describe 'Figuring out what it should do' do
         colour varchar
       );
     SQL
+    users   = sqln "select * from users;"
+    @user   = users.find { |u| u.name == 'josh' }
+    system  = users.find { |u| u.name == 'system' }
     @client = Pgvc.bootstrap db,
-                system_userid:  1,
+                system_userid:  system.id,
                 track:          ['products'],
                 default_branch: 'trunk' # I dislike "master" as the default branch name
-    @user = sql1 "select * from users where name = 'josh' limit 1;"
   end
 
   after { db.finish }
