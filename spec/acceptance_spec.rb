@@ -5,18 +5,18 @@ ROOT_DB = PG.connect dbname: 'postgres'
 DBNAME  = 'pgvc_testing'
 
 RSpec.describe 'Figuring out what it should do' do
-  attr_reader :client
+  attr_reader :db, :client, :user
+
   before do
     ROOT_DB.exec "drop database if exists #{DBNAME};"
     ROOT_DB.exec "create database #{DBNAME};"
-
-    db = PG.connect dbname: DBNAME
+    @db = PG.connect dbname: DBNAME
     db.exec <<~SQL
       create table users (
         id serial primary key,
         name varchar
       );
-      insert into users (name) values ('system');
+      insert into users (name) values ('system'), ('josh');
 
       create table products (
         id serial primary key,
@@ -24,7 +24,25 @@ RSpec.describe 'Figuring out what it should do' do
         colour varchar
       );
     SQL
-    @client = Pgvc.bootstrap db, system_userid: 1, track: ['products']
+    @client = Pgvc.bootstrap db,
+                system_userid:  1,
+                track:          ['products'],
+                default_branch: 'trunk' # I dislike "master" as the default branch name
+    @user = sql1 "select * from users where name = 'josh' limit 1;"
+  end
+
+  after { db.finish }
+
+  def sql1(sql, *params)
+    sqln(sql, *params).first
+  end
+
+  def sqln(sql, *params)
+    if params.empty?
+      db.exec sql
+    else
+      db.exec_params sql, params
+    end.map { |row| Pgvc::Record.new row }
   end
 
   def create_commit(client: self.client, **commit_options)
@@ -55,10 +73,11 @@ RSpec.describe 'Figuring out what it should do' do
 
 
   describe 'initial state' do
-    xit 'starts on the primary branch pointing at the root commit, which is empty' do
-      branch = client.branch
-      expect(branch.name).to eq 'primary'
-      expect(branch.commit.parents).to eq []
+    it 'starts on the primary branch pointing at the root commit, which is empty' do
+      branch = client.get_branch user.id
+      expect(branch.name).to eq 'trunk'
+      commit = client.get_commit branch.commit_hash
+      expect(commit.description).to match /initial commit/i
     end
   end
 
@@ -66,7 +85,7 @@ RSpec.describe 'Figuring out what it should do' do
     # probbably the primary branch should jsut be a branch tagged as "default",
     # and should be changeable, but for now, it's not worth the complexity
     it 'can create and delete branches' do
-      client.create_branch 'omghi'
+      client.create_branch 'omghi', user.id
       expect(client.branches.map(&:name).sort).to eq ['omghi', 'primary']
       client.delete_branch 'omghi'
     end
