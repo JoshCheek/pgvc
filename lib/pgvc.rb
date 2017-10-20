@@ -1,4 +1,4 @@
-class PgGit
+class Pgvc
   BaseError = Class.new StandardError
   InvalidColumn = Class.new BaseError
 
@@ -96,7 +96,7 @@ class PgGit
 end
 
 
-class PgGit
+class Pgvc
   class Branch
     CannotCreate = Class.new BaseError
     CannotDelete = Class.new BaseError
@@ -120,7 +120,7 @@ class PgGit
 end
 
 
-class PgGit
+class Pgvc
   class Commit
     attr_reader :id, :parents, :synopsis, :description, :user, :time
 

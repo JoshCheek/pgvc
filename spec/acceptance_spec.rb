@@ -1,9 +1,9 @@
 # Using a hypothetical blog (users/posts) to figure out what its behaviour should be and drive its implementation
-require 'pg_git'
+require 'pgvc'
 
 RSpec.describe 'Figuring out what it should do' do
-  let(:db)     { PgGit::Database.new }
-  let(:client) { PgGit.new db }
+  let(:db)     { Pgvc::Database.new 'pgvc_testing' }
+  let(:client) { Pgvc.new db }
 
   before do
     db.create_table :users, primary_key: :id, columns: %i[name colour]
@@ -59,12 +59,12 @@ RSpec.describe 'Figuring out what it should do' do
     it 'can\'t create a banch with the same name as an existing branch' do
       client.create_branch 'omghi'
       expect { client.create_branch 'omghi' }
-        .to raise_error PgGit::Branch::CannotCreate
+        .to raise_error Pgvc::Branch::CannotCreate
     end
 
     it 'can\'t delete the primary branch' do
       expect { client.delete_branch 'primary' }
-        .to raise_error PgGit::Branch::CannotDelete
+        .to raise_error Pgvc::Branch::CannotDelete
     end
 
     it 'can create a branch pointing to an arbitrary commit'
@@ -97,7 +97,7 @@ RSpec.describe 'Figuring out what it should do' do
     # but I think that would require changes to existing queries
     describe 'via insert' do
       it 'can insert rows and query them back out' do
-        expect(client.select_all('users')).to eq []
+        expect(client.select_all('users')).to eq [] # =>
         insert_users u1: 'brown', u2: 'green'
         assert_users name: %w[u1 u2], colour: %w[brown green]
       end
