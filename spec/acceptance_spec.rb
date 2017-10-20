@@ -24,7 +24,7 @@ RSpec.describe 'Figuring out what it should do' do
         colour varchar
       );
     SQL
-    users   = sqln "select * from users;"
+    users   = sql "select * from users;"
     @user   = users.find { |u| u.name == 'josh' }
     system  = users.find { |u| u.name == 'system' }
     @client = Pgvc.bootstrap db,
@@ -36,10 +36,10 @@ RSpec.describe 'Figuring out what it should do' do
   after { db.finish }
 
   def sql1(sql, *params)
-    sqln(sql, *params).first
+    sql(sql, *params).first
   end
 
-  def sqln(sql, *params)
+  def sql(sql, *params)
     if params.empty?
       db.exec sql
     else
@@ -80,6 +80,11 @@ RSpec.describe 'Figuring out what it should do' do
       expect(branch.name).to eq 'trunk'
       commit = client.get_commit branch.commit_hash
       expect(commit.description).to match /initial commit/i
+    end
+    it 'has adds vc_hash to the tracked tables and calculates them on insert/update' do
+      product1 = sql1 "insert into products (name, colour) values ('p1', 'blue') returning *"
+      product2 = sql1 "update products set name = 'p2' returning *"
+      expect(product1.vc_hash).to_not eq product2.vc_hash
     end
   end
 

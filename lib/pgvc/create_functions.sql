@@ -64,11 +64,43 @@ create function vc.get_commit(commit_hash character(32)) returns vc.commits as $
   $$ language sql;
 
 
-create function vc.track_table(tblname varchar) returns void as $$
+create function vc.hash_and_record_row()
+returns trigger as $$
+declare
+  serialized hstore;
+begin
+  NEW.vc_hash = null;
+  select hstore(NEW) into serialized;
+  select delete(serialized, 'vc_hash') into serialized;
+  NEW.vc_hash = md5(serialized::text);
+
+  insert into vc.rows (vc_hash, data)
+    select NEW.vc_hash, serialized
+    where not exists (select vc_hash from vc.rows where vc_hash = NEW.vc_hash);
+
+  return NEW;
+end $$ language plpgsql;
+
+
+
+create function vc.track_table(tblname varchar) returns void as $fn$
   begin
-    insert into tracked_tables (name) values (tblname)
+    insert into vc.tracked_tables (name) values (tblname)
       on conflict do nothing;
 
-    -- FIXME: Here is where we should add the trigger to the table
-  end $$ language plpgsql
-  set search_path = vc;
+    execute format(
+      'alter table %s add column vc_hash character(32)',
+      quote_ident(tblname)
+    );
+
+    -- FIXME: should this be applied to the public namespace?
+    -- maybe the public namespace should be the default?
+    execute format(
+      $$ create trigger vc_hash_and_record_%s
+         before insert or update on %s
+         for each row execute procedure vc.hash_and_record_row();
+      $$,
+      quote_ident(tblname),
+      quote_ident(tblname)
+    );
+  end $fn$ language plpgsql;
