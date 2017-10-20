@@ -1,33 +1,48 @@
 # Using a hypothetical blog (users/posts) to figure out what its behaviour should be and drive its implementation
 require 'pgvc'
 
+ROOT_DB = PG.connect dbname: 'postgres'
+DBNAME  = 'pgvc_testing'
+
 RSpec.describe 'Figuring out what it should do' do
-  let(:db)     { Pgvc::Database.new 'pgvc_testing' }
-  let(:client) { Pgvc.new db }
-
+  attr_reader :client
   before do
-    db.create_table :users, primary_key: :id, columns: %i[name colour]
+    ROOT_DB.exec "drop database if exists #{DBNAME};"
+    ROOT_DB.exec "create database #{DBNAME};"
+
+    db = PG.connect dbname: DBNAME
+    db.exec <<~SQL
+      create table users (
+        id serial primary key,
+        name varchar
+      );
+      insert into users (name) values ('system');
+
+      create table products (
+        id serial primary key,
+        name varchar,
+        colour varchar
+      );
+    SQL
+    @client = Pgvc.bootstrap db, system_userid: 1, track: ['products']
   end
 
-  def create_commit(synopsis:    'default synopsis',
-                    description: 'default description',
-                    user:        'default user',
-                    time:        Time.now,
-                    client:      self.client)
-    client.commit! synopsis:    synopsis,
-                   description: description,
-                   user:        user,
-                   time:        time
+  def create_commit(client: self.client, **commit_options)
+    commit_options[:synopsis]    ||= 'default synopsis'
+    commit_options[:description] ||= 'default description'
+    commit_options[:user]        ||= 'default user'
+    commit_options[:time]        ||= Time.now
+    client.commit! commit_options
   end
 
-  def insert_users(users, client: self.client)
-    users.each do |key, value|
-      client.insert 'users', name: key.to_s, colour: value
+  def insert_products(products, client: self.client)
+    products.each do |key, value|
+      client.insert 'products', name: key.to_s, colour: value
     end
   end
 
-  def assert_users(assertions, client: self.client)
-    results = client.select_all 'users'
+  def assert_products(assertions, client: self.client)
+    results = client.select_all 'products'
     assertions.each do |key, values|
       expect(pluck results, key).to eq values
     end
@@ -97,14 +112,14 @@ RSpec.describe 'Figuring out what it should do' do
     # but I think that would require changes to existing queries
     describe 'via insert' do
       it 'can insert rows and query them back out' do
-        expect(client.select_all('users')).to eq [] # =>
-        insert_users u1: 'brown', u2: 'green'
-        assert_users name: %w[u1 u2], colour: %w[brown green]
+        expect(client.select_all('products')).to eq [] # =>
+        insert_products u1: 'brown', u2: 'green'
+        assert_products name: %w[u1 u2], colour: %w[brown green]
       end
 
       it 'creates a new incomplete commit to hold the changes and points the branch at it' do
         prev = client.commit
-        insert_users u1: 'brown'
+        insert_products u1: 'brown'
         crnt = client.commit
         expect(prev.id).to_not eq crnt.id
         expect(prev).to be_complete
@@ -113,7 +128,7 @@ RSpec.describe 'Figuring out what it should do' do
 
       it 'sets the old commit as a parent of the new commit' do
         prev = client.commit
-        insert_users u1: 'brown'
+        insert_products u1: 'brown'
         crnt = client.commit
         expect(prev.parents).to eq []
         expect(crnt.parents).to eq [prev]
@@ -123,15 +138,15 @@ RSpec.describe 'Figuring out what it should do' do
 
     describe 'via update' do
       it 'can update rows and query them backout' do
-        insert_users u1: 'brown', u2: 'green', u3: 'cyan'
-        client.update 'users', where: {name: 'u2'}, to: {colour: 'magenta'}
-        assert_users name: %w[u1 u2 u3], colour: %w[brown magenta cyan]
-        client.update 'users', where: {name: 'u3'}, to: {colour: 'black'}
-        assert_users name: %w[u1 u2 u3], colour: %w[brown magenta black]
+        insert_products u1: 'brown', u2: 'green', u3: 'cyan'
+        client.update 'products', where: {name: 'u2'}, to: {colour: 'magenta'}
+        assert_products name: %w[u1 u2 u3], colour: %w[brown magenta cyan]
+        client.update 'products', where: {name: 'u3'}, to: {colour: 'black'}
+        assert_products name: %w[u1 u2 u3], colour: %w[brown magenta black]
       end
 
       it 'creates a new incomplete commit to hold the changes and points the branch at it'
-        # insert_users u1: 'brown'
+        # insert_products u1: 'brown'
         # create_commit
 
       it 'sets the old commit as a parent of the new commit'
@@ -140,15 +155,15 @@ RSpec.describe 'Figuring out what it should do' do
 
     describe 'via delete' do
       it 'can delete rows, which do not come back out when queried' do
-        insert_users u1: 'brown', u2: 'green', u3: 'cyan'
+        insert_products u1: 'brown', u2: 'green', u3: 'cyan'
 
-        assert_users name: %w[u1 u2 u3], colour: %w[brown green cyan]
-        client.delete 'users', where: {name: 'u2'}
-        assert_users name: %w[u1 u3], colour: %w[brown cyan]
-        client.delete 'users', where: {name: 'u1'}
-        assert_users name: %w[u3], colour: %w[cyan]
-        client.delete 'users', where: {name: 'u3'}
-        assert_users name: %w[], colour: %w[]
+        assert_products name: %w[u1 u2 u3], colour: %w[brown green cyan]
+        client.delete 'products', where: {name: 'u2'}
+        assert_products name: %w[u1 u3], colour: %w[brown cyan]
+        client.delete 'products', where: {name: 'u1'}
+        assert_products name: %w[u3], colour: %w[cyan]
+        client.delete 'products', where: {name: 'u3'}
+        assert_products name: %w[], colour: %w[]
       end
 
       it 'creates a new incomplete commit to hold the changes and points the branch at it'
@@ -180,7 +195,7 @@ RSpec.describe 'Figuring out what it should do' do
 
     describe 'when the commit is incomplete' do
       before do
-        insert_users u1: 'brown'
+        insert_products u1: 'brown'
         assert_commit complete?: false
       end
 
@@ -223,22 +238,22 @@ RSpec.describe 'Figuring out what it should do' do
       client.create_branch 'b'
 
       client.switch_branch 'a'
-      insert_users user_a: 'colour_a'
+      insert_products product_a: 'colour_a'
 
       client.switch_branch 'b'
-      assert_users name: %w[]
-      insert_users user_b: 'colour_b'
+      assert_products name: %w[]
+      insert_products product_b: 'colour_b'
 
       client.create_branch 'c'
       client.switch_branch 'c'
-      client.update 'users', with: {name: 'user_b'}, to: {colour: 'colour_c'}
+      client.update 'products', with: {name: 'product_b'}, to: {colour: 'colour_c'}
 
       client.switch_branch 'a'
-      assert_users name: %w[user_a], colour: %w[colour_a]
+      assert_products name: %w[product_a], colour: %w[colour_a]
       client.switch_branch 'b'
-      assert_users name: %w[user_b], colour: %w[colour_b]
+      assert_products name: %w[product_b], colour: %w[colour_b]
       client.switch_branch 'c'
-      assert_users name: %w[user_b], colour: %[colour_c]
+      assert_products name: %w[product_b], colour: %[colour_c]
     end
   end
 
