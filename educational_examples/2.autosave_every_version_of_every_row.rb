@@ -18,10 +18,8 @@ require_relative 'helpers'
     );
 
     -- Calculate the hash and store the record in version control
-    create function vc_hash_and_record()
-    returns trigger as $$
-    declare
-      serialized hstore;
+    create function vc_hash_and_record() returns trigger as $$
+    declare serialized hstore;
     begin
       select hstore(NEW) into serialized;
       select delete(serialized, 'vc_hash') into serialized;
@@ -41,19 +39,13 @@ require_relative 'helpers'
 
 # =====  INSERTION  =====
   # adds hashes them and saves them into the version controlled rows table
-  users1 = sql <<~SQL
-    insert into users (name)
-    values ('Divya'), ('Darby')
-    returning *;
-  SQL
+  users1 = sql "insert into users (name) values ('Divya'), ('Darby') returning *"
   # => [#<Record id='1' name='Divya' vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981'>,
   #     #<Record id='2' name='Darby' vc_hash='7a3310ec4414b76ea5633cbab642ac9d'>]
 
   vc1 = sql 'select * from vc_rows'
-  # => [#<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981'
-  #              data='"id"=>"1", "name"=>"Divya"'>,
-  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d'
-  #              data='"id"=>"2", "name"=>"Darby"'>]
+  # => [#<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981' data='"id"=>"1", "name"=>"Divya"'>,
+  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d' data='"id"=>"2", "name"=>"Darby"'>]
 
   eq! users1.map(&:vc_hash), vc1.map(&:vc_hash)
   # => ['c7a727b3c2e2fd691ef33eaa23ba9981', '7a3310ec4414b76ea5633cbab642ac9d']
@@ -84,7 +76,7 @@ require_relative 'helpers'
   #     'c7a727b3c2e2fd691ef33eaa23ba9981']
 
 
-# =====  UPDATE BACK TO ORIGINAL VALUE  =====
+# =====  UN-UPDATE (SET BACK TO ORIGINAL VALUE)  =====
   sql "update users set name = 'Darby' where name = 'Darby😜'"
   users3 = sql 'select * from users order by id'
 
@@ -94,9 +86,6 @@ require_relative 'helpers'
   # update is not recorded, because it already existed
   vc3 = sql 'select * from vc_rows order by vc_hash'
   eq! vc2, vc3
-  # => [#<Record vc_hash='52c38b2824600ac5257e1ccb566d2e2d'
-  #              data='"id"=>"2", "name"=>"Darby😜"'>,
-  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d'
-  #              data='"id"=>"2", "name"=>"Darby"'>,
-  #     #<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981'
-  #              data='"id"=>"1", "name"=>"Divya"'>]
+  # => [#<Record vc_hash='52c38b2824600ac5257e1ccb566d2e2d' data='"id"=>"2", "name"=>"Darby😜"'>,
+  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d' data='"id"=>"2", "name"=>"Darby"'>,
+  #     #<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981' data='"id"=>"1", "name"=>"Divya"'>]

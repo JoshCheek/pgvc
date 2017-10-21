@@ -41,13 +41,13 @@ sql <<~SQL
 SQL
 
 
-# "checkout" the schema
-  sql "select create_branch('mahschema');"
+# Create the branch
+  sql "select create_branch('mahbranch');"
 
-# Schema was created
-  sql "select catalog_name, schema_name from information_schema.schemata where schema_name = 'mahschema';"
-  # => [#<Record catalog_name='pg_git' schema_name='mahschema'>]
+# It created the schema
+  sql "select catalog_name, schema_name from information_schema.schemata where schema_name = 'mahbranch';"
+  # => [#<Record catalog_name='pgvc' schema_name='mahbranch'>]
 
-# Tables were created
-  sql "select table_name from information_schema.tables where table_schema = 'mahschema';"
+# It created the tables in the schema
+  sql "select table_name from information_schema.tables where table_schema = 'mahbranch';"
   # => [#<Record table_name='products'>, #<Record table_name='users'>]

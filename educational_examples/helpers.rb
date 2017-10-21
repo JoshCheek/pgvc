@@ -1,11 +1,15 @@
 require 'pg'
 
+def dbname
+  'pgvc'
+end
+
 # Reset the database
 PG.connect(dbname: 'postgres')
-  .tap { |db| db.exec "DROP DATABASE IF EXISTS pg_git;" }
-  .tap { |db| db.exec "CREATE DATABASE pg_git;" }
+  .tap { |db| db.exec "DROP DATABASE IF EXISTS #{dbname};" }
+  .tap { |db| db.exec "CREATE DATABASE #{dbname};" }
 
-$db = PG.connect dbname: 'pg_git'
+$db = PG.connect dbname: dbname
 def db
   $db
 end

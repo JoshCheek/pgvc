@@ -1,7 +1,6 @@
 # Setting the default schema so that the same query will yield different results,
 # depending on the context the user is in (hence, schemas will act as namespaces
 # for branches)
-
 require_relative 'helpers'
 
 sql <<~SQL
@@ -19,10 +18,9 @@ sql <<~SQL
 SQL
 
 # Three connections
-name = $db.conninfo_hash[:dbname]
-db1  = PG::Connection.new dbname: name
-db2  = PG::Connection.new dbname: name
-db3  = PG::Connection.new dbname: name
+db1  = PG::Connection.new dbname: dbname
+db2  = PG::Connection.new dbname: dbname
+db3  = PG::Connection.new dbname: dbname
 
 # Each connection is associated a given schema
 sql "set search_path = first",  db: db1
