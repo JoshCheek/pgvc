@@ -33,6 +33,18 @@ class Pgvc
     call_fn('get_branch', user_id, composite: true).first
   end
 
+  def switch_branch(user_id, branch_name)
+    call_fn('switch_branch', user_id, branch_name).first
+  end
+
+  def get_branches
+    call_fn 'get_branches'
+  end
+
+  def rename_branch(old, new)
+    call_fn('rename_branch', old, new, composite: true).first
+  end
+
   def get_commit(hash)
     call_fn('get_commit', hash, composite: true).first
   end
@@ -42,12 +54,16 @@ class Pgvc
   end
 
   def get_parents(commit_hash)
-    call_fn('get_parents', commit_hash)
+    call_fn 'get_parents', commit_hash
   end
 
-  # def create_branch(name, user.id)
-  #   call_fn 'create_branch', name
-  # end
+  def create_branch_from_current(name, user_id)
+    call_fn('create_branch_from_current', name, user_id, composite: true).first
+  end
+
+  def delete_branch(name)
+    call_fn('delete_branch', name).first
+  end
 
   def track_table(name)
     call_fn 'track_table', name

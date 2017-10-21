@@ -121,11 +121,9 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
 
-  describe 'branches' do
-    specify 'users can create branches based on their current branch'
-
-    it 'can, rename, and delete branches' do
-      client.create_branch 'omghi', user.id
+  describe 'branches', t:true do
+    it 'can create, rename, and delete branches' do
+      client.create_branch_from_current 'omghi', user.id
       expect(client.get_branches.map(&:name).sort).to eq ['omghi', 'trunk']
       client.rename_branch 'omghi', 'lolol'
       expect(client.get_branches.map(&:name).sort).to eq ['lolol', 'trunk']
@@ -133,13 +131,36 @@ RSpec.describe 'Figuring out what it should do' do
       expect(client.get_branches.map(&:name).sort).to eq ['trunk']
     end
 
-    it 'can have crazy branch names (spaces, commas, etc)' do
-      name = %q_abc[]{}"' ~!@\#$%^&*()+_
-      client.create_branch name, user.id
-      expect(client.get_branches.map(&:name).sort).to eq [name, 'trunk']
+    it 'knows which branch a user is on, and allows them to switch to a different branch' do
+      client.create_branch_from_current 'other', user.id
+      expect(client.get_branch(user.id).name).to eq 'trunk'
+      client.switch_branch user.id, 'other'
+      expect(client.get_branch(user.id).name).to eq 'other'
     end
 
-    it 'can\'t create a banch with the same name as an existing branch' do
+    xit 'creates a schema for the given branch sets its tables and rows up to match the given commit' do
+      sql "insert into products (name, colour) values ('boots', 'black')"
+      commit1 = create_commit summary: 'boots', user_id: user.id
+      client.create_branch_from_current 'boots', user.id
+
+      sql "insert into products (name, colour) values ('shoes', 'blue')"
+      commit2 = create_commit summary: 'boots and shoes', user_id: user.id
+      client.create_branch_from_current 'boots+shoes', user.id
+
+      client.create_branch_from_current 'mahbrnach', user.id
+    end
+
+    it 'can have crazy branch names (spaces, commas, etc)' do
+      name = %q_abc[]{}"' ~!@\#$%^&*()+_
+      client.create_branch_from_current name, user.id
+      expect(client.get_branches.map(&:name).sort).to eq [name, 'trunk']
+      skip
+      schemas = sql "select * from information_schema.schemata;"
+      require "pry"
+      binding.pry
+    end
+
+    it 'can\'t create a branch with the same name as an existing branch' do
       client.create_branch 'omghi'
       expect { client.create_branch 'omghi' }
         .to raise_error Pgvc::Branch::CannotCreate

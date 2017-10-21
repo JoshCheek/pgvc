@@ -37,25 +37,56 @@ returns void as $$
 
 
 create function vc.get_branch(user_id integer) returns vc.branches as $$
-  -- default for if the user has never checked out a branch
-  select * from vc.branches where is_default
-  union
-  -- FIXME: This hasn't been tested yet
   select branches.*
     from vc.user_branches ub
     join vc.branches on (ub.branch_id = branches.id)
     where ub.user_id = $1
+  union all
+  -- default for if the user has never checked out a branch
+  select * from vc.branches where is_default
   $$ language sql;
 
 
 
-/* create function vc.create_branch(name varchar, commit_hash character(32)) */
-/* returns vc.branches as $$ */
-/*   insert into vc.branches (commit_hash, name, schema_name, is_default) */
-/*     values ( commit_hash, name, 'branch_'||quote_ident(name), false) */
-/*     returning *; */
-/*   $$ language sql; */
+create function vc.get_branches() returns setof vc.branches as $$
+  select * from vc.branches
+  $$ language sql;
 
+
+create function vc.create_branch_from_current(name varchar, user_id integer)
+  returns vc.branches as $$
+  declare
+    branch vc.branches;
+  begin
+    branch := vc.get_branch(user_id);
+    branch := vc.create_branch(name, branch.commit_hash);
+    return branch;
+  end $$ language plpgsql;
+
+
+create function vc.rename_branch(oldname varchar, newname varchar) returns vc.branches as $$
+  update vc.branches set name = newname where name = oldname returning *
+  $$ language sql;
+
+create function vc.delete_branch(branch_name varchar) returns vc.branches as $$
+  delete from vc.branches where branches.name = branch_name returning *
+  $$ language sql;
+
+create function vc.switch_branch(userid integer, branch_name varchar, out branch vc.branches) as $$
+  begin
+    branch := (select branches from vc.branches where name = branch_name);
+    insert into vc.user_branches (user_id, branch_id, is_system)
+      values (userid, branch.id, false)
+      on conflict (user_id) do update set branch_id = EXCLUDED.branch_id;
+  end $$ language plpgsql;
+
+
+create function vc.create_branch(name varchar, commit_hash character(32))
+returns vc.branches as $$
+  insert into vc.branches (commit_hash, name, schema_name, is_default)
+    values ( commit_hash, name, 'branch_'||quote_ident(name), false)
+    returning *;
+  $$ language sql;
 
 
 create function vc.hash_and_record_row() returns trigger as $$
