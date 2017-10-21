@@ -74,17 +74,46 @@ RSpec.describe 'Figuring out what it should do' do
 
 
 
+  # Dump as much shit into a given test as we can since they're so expensive
   describe 'initial state' do
-    it 'starts on the primary branch pointing at the root commit, which is empty' do
+    it 'starts on the default branch pointing at the root commit, using the public schema, and tracks the tables' do
+      # user is on a branch (the default branch)
       branch = client.get_branch user.id
       expect(branch.name).to eq 'trunk'
+
+      # the default branch corresponds to the public schema
+      expect(branch.schema_name).to eq 'public'
+
+      # it is pointing at the initial commit
       commit = client.get_commit branch.commit_hash
       expect(commit.description).to match /initial commit/i
+
+      # it's tracking the tables
+      tables = sql('select * from vc.tracked_tables')
+      expect(tables.map &:name).to include 'products'
     end
-    it 'has adds vc_hash to the tracked tables and calculates them on insert/update' do
-      product1 = sql1 "insert into products (name, colour) values ('p1', 'blue') returning *"
-      product2 = sql1 "update products set name = 'p2' returning *"
-      expect(product1.vc_hash).to_not eq product2.vc_hash
+
+    describe 'tracking tables' do
+      it 'has adds vc_hash to the tracked tables and calculates them on insert/update' do
+        sql "create table strs (id serial primary key, val varchar);"
+        sql "insert into strs (val) values ('a');"
+        client.track_table 'strs'
+
+        # added vc_rows and calculated it for existing records
+        a = sql1 "select * from strs"
+        expect(a.vc_hash.length).to eq 32
+
+        # updates their hash on insert
+        b1 = sql1 "insert into strs (val) values ('b') returning *"
+        b2 = sql1 "update strs set val = 'B' returning *"
+        expect(b1.vc_hash).to_not eq b2.vc_hash
+
+        # all of these values are saved
+        hashes = sql("select vc_hash from vc.rows").map(&:vc_hash)
+        expect(hashes).to include a.vc_hash
+        expect(hashes).to include b1.vc_hash
+        expect(hashes).to include b2.vc_hash
+      end
     end
   end
 

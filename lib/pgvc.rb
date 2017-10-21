@@ -11,6 +11,7 @@ class Pgvc
   end
 
 
+  # track: array of names of the tables to track in version control
   def self.bootstrap(db, track:[], system_userid:, default_branch:)
     exec_sql db, 'create_tables'
     exec_sql db, 'create_functions'
@@ -51,7 +52,7 @@ class Pgvc
     connection.exec_params("select #{fn_call};", args)
               .map { |row| Record.new row }
   end
-    # insert insert vc.tracked_tables (name) values ($1);
+
   private
 
   attr_accessor :connection
