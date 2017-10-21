@@ -18,9 +18,9 @@ sql <<~SQL
   );
 
 
-  -- The function to add them, "checkout" in git-speak
-  create function checkout(in schema_name varchar)
-  returns void as $$
+  -- To create a branch: create a schema and add the tables to it
+  -- Then populate the tables with the rows for the branch's commit
+  create function create_branch(in schema_name varchar) returns void as $$
   declare
     table_name varchar;
   begin
@@ -42,12 +42,12 @@ SQL
 
 
 # "checkout" the schema
-  sql "select checkout('mahschema');"
+  sql "select create_branch('mahschema');"
 
-# it was created
+# Schema was created
   sql "select catalog_name, schema_name from information_schema.schemata where schema_name = 'mahschema';"
   # => [#<Record catalog_name='pg_git' schema_name='mahschema'>]
 
-# tbe table was created
+# Tables were created
   sql "select table_name from information_schema.tables where table_schema = 'mahschema';"
   # => [#<Record table_name='products'>, #<Record table_name='users'>]

@@ -8,15 +8,14 @@ require_relative 'helpers'
     create extension hstore;
 
     -- VERSION CONTROLLED ROWS
-    -- Can store rows from any arbitrary table. To generalize this example, store the
-    -- name of the table it's backing up. I've tested this with tables that hold booleans,
-    -- numbers, strings, composite types, enums, ranges, and hstores (yes, it can nest them!)
+    -- Can store rows from any arbitrary table. I've tested this with tables that
+    -- hold booleans, numbers, strings, composite types, enums, ranges, and hstores!
     create table vc_rows (
       id         serial primary key,
       col_values hstore
     );
 
-    -- A TABLE WE WANT TO BACK UP
+    -- A TABLE WE WANT TO STORE IN VC
     create table users (
       id   serial primary key,
       name varchar

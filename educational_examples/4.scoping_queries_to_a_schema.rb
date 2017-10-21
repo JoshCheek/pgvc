@@ -25,9 +25,9 @@ db2  = PG::Connection.new dbname: name
 db3  = PG::Connection.new dbname: name
 
 # Each connection is associated a given schema
-sql "set search_path = 'first'",  db: db1
-sql "set search_path = 'second'", db: db2
-sql "set search_path = 'third'",  db: db3
+sql "set search_path = first",  db: db1
+sql "set search_path = second", db: db2
+sql "set search_path = third",  db: db3
 
 # And, when executing the query, each finds its associated record
 sql 'select * from users', db: db1 # => [#<Record name='Josh'>]
