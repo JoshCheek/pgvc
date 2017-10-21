@@ -1,11 +1,10 @@
-create function vc.get_commit_hash(c vc.commits) returns varchar(32) as $$
+create function vc.calculate_commit_hash(c vc.commits) returns varchar(32) as $$
   select md5(concat(
     c.db_hash,
     c.user_id::text,
+    c.summary,
     c.description,
-    c.details,
-    c.created_at::text,
-    c.committed_at::text
+    c.created_at::text
   )); $$ language sql;
 
 
@@ -17,12 +16,11 @@ returns void as $$
     default_branch vc.branches;
   begin
     -- Create the initial commit
-    root_commit.user_id      := system_user_id;
-    root_commit.description  := 'Initial commit';
-    root_commit.details      := '';
-    root_commit.created_at   := now();
-    root_commit.committed_at := now();
-    root_commit.vc_hash      := vc.get_commit_hash(root_commit);
+    root_commit.user_id     := system_user_id;
+    root_commit.summary     := 'Initial commit';
+    root_commit.description := '';
+    root_commit.created_at  := now();
+    root_commit.vc_hash     := vc.calculate_commit_hash(root_commit);
     insert into vc.commits select root_commit.*;
 
     -- Create the first branch
@@ -58,10 +56,6 @@ create function vc.get_branch(user_id integer) returns vc.branches as $$
 /*     returning *; */
 /*   $$ language sql; */
 
-
-create function vc.get_commit(commit_hash character(32)) returns vc.commits as $$
-  select * from vc.commits where vc_hash = commit_hash
-  $$ language sql;
 
 
 create function vc.hash_and_record_row() returns trigger as $$
@@ -104,3 +98,32 @@ create function vc.track_table(tblname varchar) returns void as $$
     -- fire the trigger for rows already in the table
     execute format('update %s set vc_hash = vc_hash', quote_ident(tblname));
   end $$ language plpgsql;
+
+
+
+create function vc.get_commit(commit_hash character(32)) returns vc.commits as $$
+  select * from vc.commits where vc_hash = commit_hash
+  $$ language sql;
+
+
+
+create function vc.create_commit
+  ( in summary     vc.commits.summary%TYPE,
+    in description vc.commits.description%TYPE,
+    in user_id     vc.commits.user_id%TYPE,
+    in created_at  vc.commits.created_at%TYPE
+  ) returns vc.commits as $$
+  declare
+    cmt vc.commits;
+  begin
+    cmt.summary     := summary;
+    cmt.description := description;
+    cmt.user_id     := user_id;
+    cmt.created_at  := created_at;
+    cmt.db_hash     := '................................';
+    cmt.vc_hash     := vc.calculate_commit_hash(cmt);
+    raise WARNING 'COMMITTING: %', cmt;
+    insert into vc.commits select cmt.*;
+    return cmt;
+  end
+  $$ language plpgsql;

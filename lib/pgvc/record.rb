@@ -1,3 +1,5 @@
+require 'pp'
+
 class Pgvc
   class Record
     def initialize(result_hash)

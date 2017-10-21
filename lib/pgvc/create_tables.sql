@@ -25,10 +25,9 @@ create table vc.commits (
   vc_hash      character(32) primary key,
   db_hash      character(32),
   user_id      integer   not null,
-  description  varchar   not null default '',
-  details      text      not null default '',
-  created_at   timestamp not null default now(),
-  committed_at timestamp
+  summary      varchar   not null,
+  description  text      not null,
+  created_at   timestamp not null
 );
 
 create table vc.branches (

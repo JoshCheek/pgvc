@@ -23,10 +23,13 @@ RSpec.describe 'Figuring out what it should do' do
         name varchar,
         colour varchar
       );
+
+      SET client_min_messages=WARNING;
     SQL
     users   = sql "select * from users;"
     @user   = users.find { |u| u.name == 'josh' }
     system  = users.find { |u| u.name == 'system' }
+    before_bootstrap
     @client = Pgvc.bootstrap db,
                 system_userid:  system.id,
                 track:          ['products'],
@@ -34,6 +37,10 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
   after { db.finish }
+
+  def before_bootstrap
+    # noop, override in children if necessary
+  end
 
   def sql1(sql, *params)
     sql(sql, *params).first
@@ -48,11 +55,11 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
   def create_commit(client: self.client, **commit_options)
-    commit_options[:synopsis]    ||= 'default synopsis'
+    commit_options[:summary]     ||= 'default summary'
     commit_options[:description] ||= 'default description'
-    commit_options[:user]        ||= 'default user'
-    commit_options[:time]        ||= Time.now
-    client.commit! commit_options
+    commit_options[:user_id]     ||= user.id
+    commit_options[:created_at]  ||= Time.now
+    client.create_commit commit_options
   end
 
   def insert_products(products, client: self.client)
@@ -76,7 +83,12 @@ RSpec.describe 'Figuring out what it should do' do
 
   # Dump as much shit into a given test as we can since they're so expensive
   describe 'initial state' do
+    def before_bootstrap
+      sql "insert into products (name, colour) values ('boots', 'black')"
+    end
+
     it 'starts on the default branch pointing at the root commit, using the public schema, and tracks the tables' do
+      # -- branch / commit --
       # user is on a branch (the default branch)
       branch = client.get_branch user.id
       expect(branch.name).to eq 'trunk'
@@ -86,44 +98,45 @@ RSpec.describe 'Figuring out what it should do' do
 
       # it is pointing at the initial commit
       commit = client.get_commit branch.commit_hash
-      expect(commit.description).to match /initial commit/i
+      expect(commit.summary).to match /initial commit/i
 
-      # it's tracking the tables
-      tables = sql('select * from vc.tracked_tables')
-      expect(tables.map &:name).to include 'products'
+      # -- tracked tables --
+      # added vc_rows and calculated it for existing records
+      boots = sql1 "select * from products"
+      expect(boots.vc_hash.length).to eq 32
+
+      # updates their hash on insert / update
+      shoes1 = sql1 "insert into products (name, colour) values ('shoes', 'blue') returning *"
+      shoes2 = sql1 "update products set colour = 'yellow' returning *"
+      expect(shoes1.vc_hash).to_not eq shoes2.vc_hash
+
+      # all of these values are saved
+      hashes = sql("select vc_hash from vc.rows").map(&:vc_hash)
+      expect(hashes).to include boots.vc_hash
+      expect(hashes).to include shoes1.vc_hash
+      expect(hashes).to include shoes2.vc_hash
     end
 
-    describe 'tracking tables' do
-      it 'has adds vc_hash to the tracked tables and calculates them on insert/update' do
-        sql "create table strs (id serial primary key, val varchar);"
-        sql "insert into strs (val) values ('a');"
-        client.track_table 'strs'
-
-        # added vc_rows and calculated it for existing records
-        a = sql1 "select * from strs"
-        expect(a.vc_hash.length).to eq 32
-
-        # updates their hash on insert
-        b1 = sql1 "insert into strs (val) values ('b') returning *"
-        b2 = sql1 "update strs set val = 'B' returning *"
-        expect(b1.vc_hash).to_not eq b2.vc_hash
-
-        # all of these values are saved
-        hashes = sql("select vc_hash from vc.rows").map(&:vc_hash)
-        expect(hashes).to include a.vc_hash
-        expect(hashes).to include b1.vc_hash
-        expect(hashes).to include b2.vc_hash
-      end
-    end
+    # FIXME: should it add the tables?... probably :/
   end
 
+
   describe 'branches' do
-    # probbably the primary branch should jsut be a branch tagged as "default",
-    # and should be changeable, but for now, it's not worth the complexity
-    it 'can create and delete branches' do
+    specify 'users can create branches based on their current branch'
+
+    it 'can, rename, and delete branches' do
       client.create_branch 'omghi', user.id
-      expect(client.branches.map(&:name).sort).to eq ['omghi', 'primary']
-      client.delete_branch 'omghi'
+      expect(client.get_branches.map(&:name).sort).to eq ['omghi', 'trunk']
+      client.rename_branch 'omghi', 'lolol'
+      expect(client.get_branches.map(&:name).sort).to eq ['lolol', 'trunk']
+      client.delete_branch 'lolol'
+      expect(client.get_branches.map(&:name).sort).to eq ['trunk']
+    end
+
+    it 'can have crazy branch names (spaces, commas, etc)' do
+      name = %q_abc[]{}"' ~!@\#$%^&*()+_
+      client.create_branch name, user.id
+      expect(client.get_branches.map(&:name).sort).to eq [name, 'trunk']
     end
 
     it 'can\'t create a banch with the same name as an existing branch' do
@@ -133,13 +146,13 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'can\'t delete the primary branch' do
-      expect { client.delete_branch 'primary' }
+      expect { client.delete_branch 'trunk' }
         .to raise_error Pgvc::Branch::CannotDelete
     end
 
     it 'can create a branch pointing to an arbitrary commit'
 
-    it 'remembers which branch it is on' do
+    it 'remembers which branch a user is on' do
       client.create_branch 'other'
       expect(client.branch.name).to eq 'primary'
       client.switch_branch 'other'
@@ -162,127 +175,38 @@ RSpec.describe 'Figuring out what it should do' do
     end
   end
 
-  describe 'when making changes' do
-    # I suppose, ideally, it would record the current user/time when doing this,
-    # but I think that would require changes to existing queries
-    describe 'via insert' do
-      it 'can insert rows and query them back out' do
-        expect(client.select_all('products')).to eq [] # =>
-        insert_products u1: 'brown', u2: 'green'
-        assert_products name: %w[u1 u2], colour: %w[brown green]
-      end
 
-      it 'creates a new incomplete commit to hold the changes and points the branch at it' do
-        prev = client.commit
-        insert_products u1: 'brown'
-        crnt = client.commit
-        expect(prev.id).to_not eq crnt.id
-        expect(prev).to be_complete
-        expect(crnt).to_not be_complete
-      end
-
-      it 'sets the old commit as a parent of the new commit' do
-        prev = client.commit
-        insert_products u1: 'brown'
-        crnt = client.commit
-        expect(prev.parents).to eq []
-        expect(crnt.parents).to eq [prev]
-      end
-    end
-
-
-    describe 'via update' do
-      it 'can update rows and query them backout' do
-        insert_products u1: 'brown', u2: 'green', u3: 'cyan'
-        client.update 'products', where: {name: 'u2'}, to: {colour: 'magenta'}
-        assert_products name: %w[u1 u2 u3], colour: %w[brown magenta cyan]
-        client.update 'products', where: {name: 'u3'}, to: {colour: 'black'}
-        assert_products name: %w[u1 u2 u3], colour: %w[brown magenta black]
-      end
-
-      it 'creates a new incomplete commit to hold the changes and points the branch at it'
-        # insert_products u1: 'brown'
-        # create_commit
-
-      it 'sets the old commit as a parent of the new commit'
-    end
-
-
-    describe 'via delete' do
-      it 'can delete rows, which do not come back out when queried' do
-        insert_products u1: 'brown', u2: 'green', u3: 'cyan'
-
-        assert_products name: %w[u1 u2 u3], colour: %w[brown green cyan]
-        client.delete 'products', where: {name: 'u2'}
-        assert_products name: %w[u1 u3], colour: %w[brown cyan]
-        client.delete 'products', where: {name: 'u1'}
-        assert_products name: %w[u3], colour: %w[cyan]
-        client.delete 'products', where: {name: 'u3'}
-        assert_products name: %w[], colour: %w[]
-      end
-
-      it 'creates a new incomplete commit to hold the changes and points the branch at it'
-      it 'sets the old commit as a parent of the new commit'
-    end
-
-    it 'groups all the changes together on the incomplete commit'
-  end
-
-
-  describe 'committing' do
-    def assert_commit(commit: client.commit, **assertions)
+  describe 'committing', t:true do
+    def assert_commit(commit:, **assertions)
       assertions.each do |key, value|
         expect(commit[key]).to eq value
       end
     end
 
-    it 'accepts a synopsis, description, user, and time' do
+    it 'accepts a summary, description, user_id, and created_at' do
       now = Time.now
-      create_commit synopsis:    'the synopsis',
+      commit = create_commit summary:     'the summary',
+                             description: 'blah blah blah',
+                             user_id:     user.id,
+                             created_at:  now
+      assert_commit commit:      commit,
+                    summary:     'the summary',
                     description: 'blah blah blah',
-                    user:        'josh',
-                    time:        now
-      assert_commit synopsis:    'the synopsis',
-                    description: 'blah blah blah',
-                    user:        'josh',
-                    time:        now
+                    user_id:     user.id,
+                    created_at:  now.strftime('%F %T') # FIXME: should convert to zulu?
     end
 
-    describe 'when the commit is incomplete' do
-      before do
-        insert_products u1: 'brown'
-        assert_commit complete?: false
-      end
+    it 'makes the old commit a parent of the new commit and updates the branch' do
+      branch = client.get_branch(user.id)
+      prev   = client.get_commit branch.commit_hash
 
-      it 'completes the commit' do
-        create_commit
-        assert_commit complete?: true
-      end
+      commit = create_commit
 
-      it 'does not update the branch' do
-        prev_id = client.commit.id
-        create_commit
-        expect(client.commit.id).to eq prev_id
-      end
-    end
+      branch = client.get_branch(user.id)
+      crnt   = client.get_commit branch.commit_hash
 
-    describe 'when the commit is complete' do
-      before { assert_commit complete?: true }
-      it 'creates a new complete commit, which is empty' do
-        prev = client.commit
-        create_commit
-        crnt = client.commit
-
-        expect(crnt).to be_complete
-        expect(crnt.id).to_not eq prev.id
-      end
-
-      it 'makes the old commit a parent of the new commit' do
-        prev = client.commit
-        create_commit
-        crnt = client.commit
-        expect(crnt.parents).to eq [prev]
-      end
+      expect(crnt).to eq commit
+      expect(client.get_parents crnt.vc_hash).to eq [prev]
     end
   end
 

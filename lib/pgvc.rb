@@ -37,6 +37,10 @@ class Pgvc
     call_fn('get_commit', hash, composite: true).first
   end
 
+  def create_commit(summary:, description:, user_id:, created_at:)
+    call_fn('create_commit', summary, description, user_id, created_at, composite: true).first
+  end
+
   # def create_branch(name, user.id)
   #   call_fn 'create_branch', name
   # end
@@ -48,9 +52,7 @@ class Pgvc
   def call_fn(name, *args, composite: false)
     placeholders = args.map.with_index(1) { |_, i| "$#{i}" }.join(", ")
     fn_call      = "vc.#{name}(#{placeholders})"
-    fn_call      = "(#{fn_call}).*" if composite
-    connection.exec_params("select #{fn_call};", args)
-              .map { |row| Record.new row }
+    connection.exec_params("select * from #{fn_call};", args).map { |r| Record.new r }
   end
 
   private
