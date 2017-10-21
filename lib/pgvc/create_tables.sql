@@ -30,6 +30,11 @@ create table vc.commits (
   created_at   timestamp not null
 );
 
+create table vc.ancestry (
+  parent_hash character(32),
+  child_hash  character(32)
+);
+
 create table vc.branches (
   id          serial primary key,
   commit_hash character(32),

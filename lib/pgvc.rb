@@ -41,6 +41,10 @@ class Pgvc
     call_fn('create_commit', summary, description, user_id, created_at, composite: true).first
   end
 
+  def get_parents(commit_hash)
+    call_fn('get_parents', commit_hash)
+  end
+
   # def create_branch(name, user.id)
   #   call_fn 'create_branch', name
   # end

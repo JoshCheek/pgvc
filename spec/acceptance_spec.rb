@@ -176,7 +176,7 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
 
-  describe 'committing', t:true do
+  describe 'committing' do
     def assert_commit(commit:, **assertions)
       assertions.each do |key, value|
         expect(commit[key]).to eq value

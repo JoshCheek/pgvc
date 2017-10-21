@@ -114,7 +114,6 @@ create function vc.save_table
   ) as $$
   declare row_hashes character(32)[];
   begin
-    raise WARNING 'schema: %, table: %', schema_name, table_name;
     execute format('select array_agg(vc_hash) from %s.%s;',
                    quote_ident(schema_name),
                    quote_ident(table_name))
@@ -163,7 +162,18 @@ create function vc.create_commit
     cmt.db_hash     := vc.save_branch(branch.schema_name);
     cmt.vc_hash     := vc.calculate_commit_hash(cmt);
     insert into vc.commits select cmt.*;
+    insert into vc.ancestry (parent_hash, child_hash)
+      values (branch.commit_hash, cmt.vc_hash);
     update vc.branches set commit_hash = cmt.vc_hash where id = branch.id;
     return cmt;
   end
   $$ language plpgsql;
+
+
+
+create function vc.get_parents(in commit_hash character(32)) returns setof vc.commits as $$
+  select commits.*
+  from vc.ancestry
+  join vc.commits on (ancestry.parent_hash = commits.vc_hash)
+  where ancestry.child_hash = commit_hash;
+  $$ language sql;
