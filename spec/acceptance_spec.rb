@@ -42,11 +42,18 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
   def sql(sql, *params)
+    db = get_db(user)
     if params.empty?
       db.exec sql
     else
       db.exec_params sql, params
     end.map { |row| Pgvc::Record.new row }
+  end
+
+  def get_db(user)
+    return self.db unless user && client
+    branch = client.get_branch user.id
+    client.connection_for(branch.name)
   end
 
   def create_commit(client: self.client, **commit_options)
@@ -59,19 +66,19 @@ RSpec.describe 'Figuring out what it should do' do
 
   def insert_products(products, client: self.client)
     products.each do |key, value|
-      client.insert 'products', name: key.to_s, colour: value
+      sql 'insert into products (name, colour) values ($1, $2)', key, value
     end
   end
 
   def assert_products(assertions, client: self.client)
-    results = client.select_all 'products'
+    results = sql('select * from products')
     assertions.each do |key, values|
       expect(pluck results, key).to eq values
     end
   end
 
-  def pluck(hashes, key)
-    hashes.map { |hash| hash.fetch key }
+  def pluck(records, key)
+    records.map { |record| record[key] }
   end
 
 
@@ -148,11 +155,11 @@ RSpec.describe 'Figuring out what it should do' do
     it 'can have crazy branch names (spaces, commas, etc)' do
       name = %q_abc[]{}"' ~!@\#$%^&*()+_
       client.create_branch name, user.id
-      expect(client.get_branches.map(&:name).sort).to eq [name, 'trunk']
-      skip
-      schemas = sql "select * from information_schema.schemata;"
-      require "pry"
-      binding.pry
+      client.switch_branch user.id, name
+      sql "insert into products (name, colour) values ('a','a')"
+      assert_products name: %w[a]
+      client.switch_branch user.id, 'trunk'
+      assert_products name: %w[]
     end
 
     it 'can\'t create a branch with the same name as an existing branch' do
@@ -228,27 +235,29 @@ RSpec.describe 'Figuring out what it should do' do
 
   describe 'history' do
     # should probably be able to set a branch at an arbitrary commit, but I'll deal w/ it later
-    xit 'displays the database as it looks from a given branch' do
-      client.create_branch 'a'
-      client.create_branch 'b'
+    it 'displays the database as it looks from a given branch' do
+      client.create_branch 'a', user.id
+      client.create_branch 'b', user.id
 
-      client.switch_branch 'a'
+      client.switch_branch user.id, 'a'
       insert_products product_a: 'colour_a'
+      create_commit
 
-      client.switch_branch 'b'
+      client.switch_branch user.id, 'b'
       assert_products name: %w[]
       insert_products product_b: 'colour_b'
+      create_commit
 
-      client.create_branch 'c'
-      client.switch_branch 'c'
-      client.update 'products', with: {name: 'product_b'}, to: {colour: 'colour_c'}
+      client.create_branch 'c', user.id
+      client.switch_branch user.id, 'c'
+      get_db(user).exec "update products set colour = 'colour_c' where name = 'product_b'"
 
-      client.switch_branch 'a'
+      client.switch_branch user.id, 'a'
       assert_products name: %w[product_a], colour: %w[colour_a]
-      client.switch_branch 'b'
+      client.switch_branch user.id, 'b'
       assert_products name: %w[product_b], colour: %w[colour_b]
-      client.switch_branch 'c'
-      assert_products name: %w[product_b], colour: %[colour_c]
+      client.switch_branch user.id, 'c'
+      assert_products name: %w[product_b], colour: %w[colour_c]
     end
   end
 

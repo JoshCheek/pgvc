@@ -30,9 +30,11 @@ class Pgvc
       end
     end
 
-    def [](key)
-      @hash[key.intern]
+    def fetch(key)
+      @hash.fetch key.intern
     end
+
+    alias [] fetch
 
     def inspect
       "#<Record#{@hash.map { |k, v| " #{k}=#{v.inspect}" }.join}>"
