@@ -30,8 +30,8 @@ RSpec.describe 'Figuring out what it should do' do
     before_bootstrap
     @client = Pgvc.bootstrap db,
                 system_userid:  system.id,
-                track:          ['products'],
                 default_branch: 'trunk' # I dislike "master" as the default branch name
+    @client.track_table 'products'
   end
 
   def before_bootstrap

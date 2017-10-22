@@ -37,7 +37,7 @@ db = PG.connect dbname: 'pgvc_testing'
     #     #<Record id="3" name="system">]
 
 # Add version control to the database
-  pgvc = Pgvc.bootstrap db, system_userid: system.id, track: ['products'], default_branch: 'master'
+  pgvc = Pgvc.bootstrap db, system_userid: system.id, default_branch: 'master'
 
 # Josh is on the default branch, "master", which is in the "public" schema
   master = pgvc.get_branch josh.id
@@ -54,10 +54,13 @@ db = PG.connect dbname: 'pgvc_testing'
   #             user_id="3"
   #             summary="Initial commit"
   #             description=""
-  #             created_at="2017-10-22 07:13:42.053333">
+  #             created_at="2017-10-22 12:39:36.898678">
+
+# Tell pgvc to track the products table
+  pgvc.track_table 'products'
 
 # Josh commits the boots
-  pgvc.create_commit summary: 'Add pre-existing products', description: '', user_id: josh.id, created_at: Time.now
+  pgvc.create_commit summary: 'Add pre-existing products', user_id: josh.id
 
 # Master has been updated to the new commit
   master = pgvc.get_branch josh.id

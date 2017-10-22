@@ -4,22 +4,14 @@ require 'pgvc/record'
 class Pgvc
   SQL_PATH = File.expand_path 'pgvc', __dir__
 
-  def self.exec_sql(db, filename)
-    path = File.join SQL_PATH, filename
-    path = "#{path}.sql" unless path.end_with? '.sql'
-    db.exec File.read(path)
+  def self.file(filename)
+    File.read File.join(SQL_PATH, filename)
   end
 
-
-  # track: array of names of the tables to track in version control
-  def self.bootstrap(db, track:[], system_userid:, default_branch:)
-    exec_sql db, 'create_tables'
-    exec_sql db, 'create_functions'
-
-    client = new(db)
-    client.call_fn 'initialize', system_userid, default_branch
-    track.each { |table_name| client.track_table table_name }
-    client
+  def self.bootstrap(db, system_userid:, default_branch:)
+    db.exec file('create_tables.sql')
+    db.exec file('create_functions.sql')
+    new(db).tap { |pgvc| pgvc.fn 'initialize', system_userid, default_branch }
   end
 end
 
@@ -32,49 +24,53 @@ class Pgvc
   end
 
   def get_branch(user_id)
-    call_fn('get_branch', user_id, composite: true).first
+    fn1 'get_branch', user_id
   end
 
   def switch_branch(user_id, branch_name)
-    call_fn('switch_branch', user_id, branch_name).first
+    fn1 'switch_branch', user_id, branch_name
   end
 
   def get_branches
-    call_fn 'get_branches'
+    fn 'get_branches'
   end
 
   def rename_branch(old, new)
-    call_fn('rename_branch', old, new, composite: true).first
+    fn1 'rename_branch', old, new
   end
 
   def get_commit(hash)
-    call_fn('get_commit', hash, composite: true).first
+    fn1 'get_commit', hash
   end
 
-  def create_commit(summary:, description:, user_id:, created_at:)
-    call_fn('create_commit', summary, description, user_id, created_at, composite: true).first
+  def create_commit(summary:, user_id:, description:'', created_at:Time.now)
+    fn1 'create_commit', summary, description, user_id, created_at
   end
 
   def get_parents(commit_hash)
-    call_fn 'get_parents', commit_hash
+    fn 'get_parents', commit_hash
   end
 
   def create_branch_from_current(name, user_id)
-    call_fn('create_branch_from_current', name, user_id, composite: true).first
+    fn1 'create_branch_from_current', name, user_id
   end
 
   def delete_branch(name)
-    call_fn('delete_branch', name).first
+    fn1 'delete_branch', name
   end
 
   def track_table(name)
-    call_fn 'track_table', name
+    fn 'track_table', name
   end
 
-  def call_fn(name, *args, composite: false)
+  def fn(name, *args)
     placeholders = args.map.with_index(1) { |_, i| "$#{i}" }.join(", ")
     fn_call      = "vc.#{name}(#{placeholders})"
     connection.exec_params("select * from #{fn_call};", args).map { |r| Record.new r }
+  end
+
+  def fn1(*args, &block)
+    fn(*args, &block).first
   end
 
   def connection_for(branch_name)
