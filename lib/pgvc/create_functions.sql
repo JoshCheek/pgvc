@@ -95,6 +95,8 @@ returns vc.branches as $$
     insert into vc.branches (commit_hash, name, schema_name, is_default)
       values (commit_hash, name, '', false)
       returning * into branch;
+
+    -- its schema_name is based on its id
     update vc.branches set schema_name = 'branch_'||branch.id
       where id = branch.id
       returning * into branch;
@@ -108,6 +110,7 @@ returns vc.branches as $$
     -- create the schema
     execute format('create schema %s', quote_ident(branch.schema_name));
 
+    -- for each table
     for table_name in
       select t.name from vc.tracked_tables t
     loop
@@ -136,10 +139,12 @@ returns vc.branches as $$
       table_hash := db.table_hashes->table_name;
       row_hashes := (select tables.row_hashes from vc.tables where vc_hash = table_hash);
       execute format(
-        $sql$ insert into %s.%s
-              select (populate_record(null::%s.%s, data)).*
-              from unnest($1) recorded_hash
-              left join vc.rows on vc_hash = recorded_hash
+        $sql$
+          insert into %s.%s
+          select vc_record.*
+          from unnest($1) as row_hash
+          join vc.rows on vc_hash = row_hash
+          join populate_record(null::%s.%s, data) as vc_record on true
         $sql$,
         quote_ident(branch.schema_name),
         quote_ident(table_name),
@@ -155,8 +160,7 @@ create function vc.hash_and_record_row() returns trigger as $$
   declare
     serialized hstore;
   begin
-    select hstore(NEW) into serialized;
-    select delete(serialized, 'vc_hash') into serialized;
+    serialized := delete(hstore(NEW), 'vc_hash');
     NEW.vc_hash = md5(serialized::text);
 
     insert into vc.rows (vc_hash, data)
