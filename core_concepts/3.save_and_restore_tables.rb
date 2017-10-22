@@ -62,8 +62,8 @@ sql <<~SQL
       insert into users
         select vc_user.*
         from unnest(hashes) as hash
-        left join vc_rows on vc_hash = hash
-        left join populate_record(null::users, col_values) as vc_user on true;
+        join vc_rows on vc_hash = hash
+        join populate_record(null::users, col_values) as vc_user on true;
     end $$ language plpgsql
 SQL
 
