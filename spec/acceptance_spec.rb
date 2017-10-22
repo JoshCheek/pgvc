@@ -1,17 +1,17 @@
 # Using a hypothetical blog (users/posts) to figure out what its behaviour should be and drive its implementation
 require 'pgvc'
-
-ROOT_DB = PG.connect dbname: 'postgres'
-DBNAME  = 'pgvc_testing'
+require 'spec_helper'
 
 RSpec.describe 'Figuring out what it should do' do
   attr_reader :db, :client, :user
 
+  before { ROOT_DB.exec 'select reset_test_db()' }
+
   before do
-    ROOT_DB.exec "drop database if exists #{DBNAME};"
-    ROOT_DB.exec "create database #{DBNAME};"
     @db = PG.connect dbname: DBNAME
     db.exec <<~SQL
+      SET client_min_messages=WARNING;
+
       create table users (
         id serial primary key,
         name varchar
@@ -23,8 +23,6 @@ RSpec.describe 'Figuring out what it should do' do
         name varchar,
         colour varchar
       );
-
-      SET client_min_messages=WARNING;
     SQL
     users   = sql "select * from users;"
     @user   = users.find { |u| u.name == 'josh' }
@@ -35,8 +33,6 @@ RSpec.describe 'Figuring out what it should do' do
                 track:          ['products'],
                 default_branch: 'trunk' # I dislike "master" as the default branch name
   end
-
-  after { db.finish }
 
   def before_bootstrap
     # noop, override in children if necessary
