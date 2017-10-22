@@ -1,11 +1,11 @@
-create function vc.init(system_user_id integer, default_branchname varchar)
+create function vc.init(system_user_ref varchar, default_branchname varchar)
 returns void as $$
   declare
     root_commit    vc.commits;
     default_branch vc.branches;
   begin
     -- Create the initial commit
-    root_commit.user_id     := system_user_id;
+    root_commit.user_ref    := system_user_ref;
     root_commit.summary     := 'Initial commit';
     root_commit.description := '';
     root_commit.created_at  := now();
@@ -19,17 +19,17 @@ returns void as $$
       into default_branch;
 
     -- Save the system user id to that branch
-    insert into vc.user_branches (user_id, branch_id, is_system)
-      values (system_user_id, default_branch.id, true);
+    insert into vc.user_branches (user_ref, branch_id, is_system)
+      values (system_user_ref, default_branch.id, true);
   end $$ language plpgsql;
 
 
 
-create function vc.get_branch(user_id integer) returns vc.branches as $$
+create function vc.get_branch(user_ref varchar) returns vc.branches as $$
   select branches.*
     from vc.user_branches ub
     join vc.branches on (ub.branch_id = branches.id)
-    where ub.user_id = $1
+    where ub.user_ref = $1
   union all
   -- default for if the user has never checked out a branch
   select * from vc.branches where is_default
@@ -42,12 +42,12 @@ create function vc.get_branches() returns setof vc.branches as $$
   $$ language sql;
 
 
-create function vc.create_branch_from_current(name varchar, user_id integer)
+create function vc.create_branch_from_current(name varchar, user_ref varchar)
   returns vc.branches as $$
   declare
     branch vc.branches;
   begin
-    branch := vc.get_branch(user_id);
+    branch := vc.get_branch(user_ref);
     branch := vc.create_branch(name, branch.commit_hash);
     return branch;
   end $$ language plpgsql;
@@ -61,12 +61,12 @@ create function vc.delete_branch(branch_name varchar) returns vc.branches as $$
   delete from vc.branches where branches.name = branch_name returning *
   $$ language sql;
 
-create function vc.switch_branch(userid integer, branch_name varchar, out branch vc.branches) as $$
+create function vc.switch_branch(_user_ref varchar, branch_name varchar, out branch vc.branches) as $$
   begin
     branch := (select branches from vc.branches where name = branch_name);
-    insert into vc.user_branches (user_id, branch_id, is_system)
-      values (userid, branch.id, false)
-      on conflict (user_id) do update set branch_id = EXCLUDED.branch_id;
+    insert into vc.user_branches (user_ref, branch_id, is_system)
+      values (_user_ref, branch.id, false)
+      on conflict (user_ref) do update set branch_id = EXCLUDED.branch_id;
   end $$ language plpgsql;
 
 
@@ -181,17 +181,17 @@ create function vc.get_commit(commit_hash character(32)) returns vc.commits as $
 create function vc.create_commit
   ( in summary     vc.commits.summary%TYPE,
     in description vc.commits.description%TYPE,
-    in user_id     vc.commits.user_id%TYPE,
+    in user_ref    vc.commits.user_ref%TYPE,
     in created_at  vc.commits.created_at%TYPE
   ) returns vc.commits as $$
   declare
     cmt vc.commits;
     branch vc.branches;
   begin
-    branch          := vc.get_branch(user_id);
+    branch          := vc.get_branch(user_ref);
     cmt.summary     := summary;
     cmt.description := description;
-    cmt.user_id     := user_id;
+    cmt.user_ref    := user_ref;
     cmt.created_at  := created_at;
     cmt.db_hash     := vc.save_branch(branch.schema_name);
     cmt.vc_hash     := vc.calculate_commit_hash(cmt);

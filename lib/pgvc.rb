@@ -8,11 +8,11 @@ class Pgvc
     File.read File.join(SQL_PATH, filename)
   end
 
-  def self.init(db, system_userid:, default_branch:)
+  def self.init(db, system_user_ref:, default_branch:)
     db.exec file('tables.sql')
     db.exec file('private_functions.sql')
     db.exec file('public_functions.sql')
-    new(db).tap { |pgvc| pgvc.fn 'init', system_userid, default_branch }
+    new(db).tap { |pgvc| pgvc.fn 'init', system_user_ref.to_s, default_branch }
   end
 end
 
@@ -24,12 +24,12 @@ class Pgvc
     self.branch_connections = {}
   end
 
-  def get_branch(user_id)
-    fn1 'get_branch', user_id
+  def get_branch(user_ref)
+    fn1 'get_branch', user_ref.to_s
   end
 
-  def switch_branch(user_id, branch_name)
-    fn1 'switch_branch', user_id, branch_name
+  def switch_branch(user_ref, branch_name)
+    fn1 'switch_branch', user_ref.to_s, branch_name
   end
 
   def get_branches
@@ -44,16 +44,16 @@ class Pgvc
     fn1 'get_commit', hash
   end
 
-  def create_commit(summary:, user_id:, description:'', created_at:Time.now)
-    fn1 'create_commit', summary, description, user_id, created_at
+  def create_commit(summary:, user_ref:, description:'', created_at:Time.now)
+    fn1 'create_commit', summary, description, user_ref.to_s, created_at
   end
 
   def get_parents(commit_hash)
     fn 'get_parents', commit_hash
   end
 
-  def create_branch_from_current(name, user_id)
-    fn1 'create_branch_from_current', name, user_id
+  def create_branch_from_current(name, user_ref)
+    fn1 'create_branch_from_current', name, user_ref.to_s
   end
 
   def delete_branch(name)

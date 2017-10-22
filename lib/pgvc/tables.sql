@@ -24,7 +24,7 @@ create table vc.databases (
 create table vc.commits (
   vc_hash      character(32) primary key,
   db_hash      character(32),
-  user_id      integer   not null,
+  user_ref     varchar   not null,
   summary      varchar   not null,
   description  text      not null,
   created_at   timestamp not null
@@ -44,7 +44,7 @@ create table vc.branches (
 );
 
 create table vc.user_branches (
-  user_id   integer primary key,
+  user_ref  varchar primary key, -- make it an id of your users table, or a username or w/e
   branch_id integer,
   is_system boolean -- if true, this user is the one we should use when the system
 );

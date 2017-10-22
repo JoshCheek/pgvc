@@ -37,7 +37,7 @@ db = PG.connect dbname: 'pgvc_testing'
     #     #<Record id="3" name="system">]
 
 # Add version control to the database
-  pgvc = Pgvc.init db, system_userid: system.id, default_branch: 'master'
+  pgvc = Pgvc.init db, system_user_ref: system.id, default_branch: 'master'
 
 # Josh is on the default branch, "master", which is in the "public" schema
   master = pgvc.get_branch josh.id
@@ -51,7 +51,7 @@ db = PG.connect dbname: 'pgvc_testing'
   pgvc.get_commit master.commit_hash
   # => #<Record vc_hash="695993188132d3b2de0639dcd825d1f2"
   #             db_hash=nil
-  #             user_id="3"
+  #             user_ref="3"
   #             summary="Initial commit"
   #             description=""
   #             created_at="2017-10-22 12:39:36.898678">
@@ -60,14 +60,14 @@ db = PG.connect dbname: 'pgvc_testing'
   pgvc.track_table 'products'
 
 # Josh commits the boots
-  pgvc.create_commit summary: 'Add pre-existing products', user_id: josh.id
+  pgvc.create_commit summary: 'Add pre-existing products', user_ref: josh.id
 
 # Master has been updated to the new commit
   master = pgvc.get_branch josh.id
   commit = pgvc.get_commit master.commit_hash
   # => #<Record vc_hash="b890568a19a7fd5ffaaf316bb855fafb"
   #             db_hash="fdad56fe1d8185215bb1da4441c5f5b2"
-  #             user_id="1"
+  #             user_ref="1"
   #             summary="Add pre-existing products"
   #             description=""
   #             created_at="2017-10-22 07:13:42">
@@ -105,9 +105,9 @@ db = PG.connect dbname: 'pgvc_testing'
   #      "vc_hash"=>"b95fcc685e439417cae418e97366685c"}]
 
 # Josh and Lucy both commit
-  update_boots = pgvc.create_commit summary: 'Boots are brown', description: '', user_id: josh.id, created_at: Time.now
-  add_shoes    = pgvc.create_commit summary: 'Add shoes', description: '', user_id: lucy.id, created_at: Time.now
-  pgvc.history_from update_boots.vc_hash # ~> NoMethodError: undefined method `history_from' for #<Pgvc:0x007faf23913b18>
+  update_boots = pgvc.create_commit summary: 'Boots are brown', description: '', user_ref: josh.id, created_at: Time.now
+  add_shoes    = pgvc.create_commit summary: 'Add shoes', description: '', user_ref: lucy.id, created_at: Time.now
+  pgvc.history_from update_boots.vc_hash # ~> NoMethodError: undefined method `history_from' for #<Pgvc:0x007fc7bd0cacb0>
   # =>
   pgvc.history_from add_shoes.vc_hash
   # =>
