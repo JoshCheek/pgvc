@@ -279,8 +279,16 @@ RSpec.describe 'Figuring out what it should do' do
     end
   end
 
-  describe 'diffing returns the set of changes between two commits' do
-    example 'an empty commit'
+  describe 'diffing returns the set of changes between two commits', t:true do
+    example 'an empty commit' do
+      branch = client.get_branch user.id
+      old    = client.get_commit branch.commit_hash
+      new    = create_commit
+      expect(old).to_not eq new
+      diff = client.diff old.vc_hash, new.vc_hash
+      expect(diff).to eq []
+    end
+
     example 'insertions'
     example 'deletions'
     example 'updates'

@@ -64,6 +64,10 @@ class Pgvc
     fn 'track_table', name
   end
 
+  def diff(from_hash, to_hash)
+    fn 'diff', from_hash, to_hash
+  end
+
   def fn(name, *args)
     placeholders = args.map.with_index(1) { |_, i| "$#{i}" }.join(", ")
     fn_call      = "vc.#{name}(#{placeholders})"

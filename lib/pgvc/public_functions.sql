@@ -221,3 +221,11 @@ create function vc.get_parents(in commit_hash character(32)) returns setof vc.co
   join vc.commits on (ancestry.parent_hash = commits.vc_hash)
   where ancestry.child_hash = commit_hash;
   $$ language sql;
+
+
+
+-- action: 'create' or 'delete'
+create function vc.diff(in from_hash character(32), in to_hash character(32))
+  returns table(action varchar, table_name varchar, hash character(32)) as $$
+  begin
+  end $$ language plpgsql;
