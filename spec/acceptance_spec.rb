@@ -121,7 +121,7 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
 
-  describe 'branches', t:true do
+  describe 'branches' do
     it 'can create, rename, and delete branches' do
       client.create_branch_from_current 'omghi', user.id
       expect(client.get_branches.map(&:name).sort).to eq ['omghi', 'trunk']
@@ -254,6 +254,22 @@ RSpec.describe 'Figuring out what it should do' do
       assert_products name: %w[product_b], colour: %w[colour_b]
       client.switch_branch 'c'
       assert_products name: %w[product_b], colour: %[colour_c]
+    end
+  end
+
+  describe 'working on a branch' do
+    def before_bootstrap
+      sql "insert into products (name, colour) values ('a', 'a')"
+    end
+    it 'applies those changes to only that branch' do
+      create_commit
+      client.create_branch_from_current 'other', user.id
+      client.connection_for('trunk').exec("insert into products (name, colour) values ('b', 'b')")
+      client.connection_for('other').exec("insert into products (name, colour) values ('c', 'c')")
+      trunk_products = client.connection_for('trunk').exec("select * from products").map { |r| r['name'] }
+      other_products = client.connection_for('other').exec("select * from products").map { |r| r['name'] }
+      expect(trunk_products).to eq ['a', 'b']
+      expect(other_products).to eq ['a', 'c']
     end
   end
 

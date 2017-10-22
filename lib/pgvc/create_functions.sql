@@ -83,10 +83,59 @@ create function vc.switch_branch(userid integer, branch_name varchar, out branch
 
 create function vc.create_branch(name varchar, commit_hash character(32))
 returns vc.branches as $$
-  insert into vc.branches (commit_hash, name, schema_name, is_default)
-    values ( commit_hash, name, 'branch_'||quote_ident(name), false)
-    returning *;
-  $$ language sql;
+  declare
+    branch vc.branches;
+    db     vc.databases;
+    cmt    vc.commits;
+    table_name varchar;
+    table_hash varchar;
+    row_hashes character(32)[];
+  begin
+    -- create the branch
+    insert into vc.branches (commit_hash, name, schema_name, is_default)
+      values (commit_hash, name, '', false)
+      returning * into branch;
+    update vc.branches set schema_name = 'branch_'||branch.id
+      where id = branch.id
+      returning * into branch;
+
+    -- get the commit
+    cmt := (select commits from vc.commits where vc_hash = commit_hash);
+
+    -- get the database
+    db := (select databases from vc.databases where vc_hash = cmt.db_hash);
+
+    -- create the schema
+    execute format('create schema %s', quote_ident(branch.schema_name));
+
+    for table_name in
+      select t.name from vc.tracked_tables t
+    loop
+      -- create the table
+      execute format(
+        'create table %s.%s (like public.%s including all);',
+        quote_ident(branch.schema_name),
+        quote_ident(table_name),
+        quote_ident(table_name)
+      );
+
+      -- insert the rows
+      table_hash := db.table_hashes->table_name;
+      row_hashes := (select tables.row_hashes from vc.tables where vc_hash = table_hash);
+      execute format(
+        $sql$ insert into %s.%s
+              select (populate_record(null::%s.%s, data)).*
+              from unnest($1) recorded_hash
+              left join vc.rows on vc_hash = recorded_hash
+        $sql$,
+        quote_ident(branch.schema_name),
+        quote_ident(table_name),
+        quote_ident(branch.schema_name),
+        quote_ident(table_name)
+      ) using row_hashes;
+    end loop;
+    return branch;
+  end $$ language plpgsql;
 
 
 create function vc.hash_and_record_row() returns trigger as $$

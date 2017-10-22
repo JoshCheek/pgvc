@@ -24,9 +24,11 @@ class Pgvc
 end
 
 
+require 'pg'
 class Pgvc
-  def initialize(connection)
-    self.connection = connection
+  def initialize(db)
+    self.connection = db
+    self.branch_connections = {}
   end
 
   def get_branch(user_id)
@@ -75,8 +77,26 @@ class Pgvc
     connection.exec_params("select * from #{fn_call};", args).map { |r| Record.new r }
   end
 
+  def connection_for(branch_name)
+    branch_connections.fetch branch_name do
+      branch_connections[branch_name] = build_connection_for branch_name
+    end
+  end
+
   private
 
-  attr_accessor :connection
+  attr_accessor :connection, :branch_connections
+
+  def dbname
+    connection.conninfo_hash.fetch :dbname
+  end
+
+  def build_connection_for(branch_name)
+    conn     = PG.connect dbname: dbname
+    branches = conn.exec_params('select * from vc.branches where name = $1', [branch_name])
+    branch   = Record.new branches.first
+    conn.exec_params "set search_path = #{branch.schema_name}, public;"
+    conn
+  end
 end
 
