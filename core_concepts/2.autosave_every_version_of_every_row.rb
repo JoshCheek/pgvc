@@ -6,8 +6,8 @@ require_relative 'helpers'
     -- version controlled rows
     create extension hstore;
     create table vc_rows (
-      vc_hash character(32) unique,
-      data    hstore
+      vc_hash character(32) primary key,
+      col_values hstore
     );
 
     -- record changes to this table
@@ -21,10 +21,9 @@ require_relative 'helpers'
     create function vc_hash_and_record() returns trigger as $$
     declare serialized hstore;
     begin
-      select hstore(NEW) into serialized;
-      select delete(serialized, 'vc_hash') into serialized;
-      NEW.vc_hash = md5(serialized::text);
-      insert into vc_rows (vc_hash, data)
+      serialized := delete(hstore(NEW), 'vc_hash');
+      NEW.vc_hash := md5(serialized::text);
+      insert into vc_rows (vc_hash, col_values)
         select NEW.vc_hash, serialized
         on conflict do nothing;
       return NEW;
@@ -44,18 +43,16 @@ require_relative 'helpers'
   #     #<Record id='2' name='Darby' vc_hash='7a3310ec4414b76ea5633cbab642ac9d'>]
 
   vc1 = sql 'select * from vc_rows'
-  # => [#<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981' data='"id"=>"1", "name"=>"Divya"'>,
-  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d' data='"id"=>"2", "name"=>"Darby"'>]
+  # => [#<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981' col_values='"id"=>"1", "name"=>"Divya"'>,
+  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d' col_values='"id"=>"2", "name"=>"Darby"'>]
 
   eq! users1.map(&:vc_hash), vc1.map(&:vc_hash)
   # => ['c7a727b3c2e2fd691ef33eaa23ba9981', '7a3310ec4414b76ea5633cbab642ac9d']
 
   # How the hash was calculated:
   require 'digest/md5'
-  vc1[0].tap do |row|
-    Digest::MD5.hexdigest row.data  # => 'c7a727b3c2e2fd691ef33eaa23ba9981'
-    row.vc_hash                     # => 'c7a727b3c2e2fd691ef33eaa23ba9981'
-  end
+  Digest::MD5.hexdigest vc1[0].col_values # => 'c7a727b3c2e2fd691ef33eaa23ba9981'
+  vc1[0].vc_hash                          # => 'c7a727b3c2e2fd691ef33eaa23ba9981'
 
 # =====  UPDATE  =====
   sql "update users set name = 'Darby😜' where name = 'Darby'"
@@ -86,6 +83,6 @@ require_relative 'helpers'
   # update is not recorded, because it already existed
   vc3 = sql 'select * from vc_rows order by vc_hash'
   eq! vc2, vc3
-  # => [#<Record vc_hash='52c38b2824600ac5257e1ccb566d2e2d' data='"id"=>"2", "name"=>"Darby😜"'>,
-  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d' data='"id"=>"2", "name"=>"Darby"'>,
-  #     #<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981' data='"id"=>"1", "name"=>"Divya"'>]
+  # => [#<Record vc_hash='52c38b2824600ac5257e1ccb566d2e2d' col_values='"id"=>"2", "name"=>"Darby😜"'>,
+  #     #<Record vc_hash='7a3310ec4414b76ea5633cbab642ac9d' col_values='"id"=>"2", "name"=>"Darby"'>,
+  #     #<Record vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981' col_values='"id"=>"1", "name"=>"Divya"'>]

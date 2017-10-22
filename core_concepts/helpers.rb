@@ -5,11 +5,14 @@ def dbname
 end
 
 # Reset the database
-PG.connect(dbname: 'postgres')
-  .tap { |db| db.exec "DROP DATABASE IF EXISTS #{dbname};" }
-  .tap { |db| db.exec "CREATE DATABASE #{dbname};" }
+begin
+  $db = PG.connect dbname: dbname
+  $db.exec 'begin' # transaction so everything we do will be thrown away in the end
+rescue PG::ConnectionBad
+  PG.connect(dbname: 'postgres').exec("create database #{dbname};")
+  retry
+end
 
-$db = PG.connect dbname: dbname
 def db
   $db
 end

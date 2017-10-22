@@ -11,7 +11,6 @@ require_relative 'helpers'
     -- Can store rows from any arbitrary table. I've tested this with tables that
     -- hold booleans, numbers, strings, composite types, enums, ranges, and hstores!
     create table vc_rows (
-      id         serial primary key,
       col_values hstore
     );
 
@@ -38,8 +37,8 @@ require_relative 'helpers'
     from users
     returning *;
   SQL
-  # => [#<Record id='1' col_values='"id"=>"1", "name"=>"Josh"'>,
-  #     #<Record id='2' col_values='"id"=>"2", "name"=>"Ashton"'>]
+  # => [#<Record col_values='"id"=>"1", "name"=>"Josh"'>,
+  #     #<Record col_values='"id"=>"2", "name"=>"Ashton"'>]
 
 
 # Delete the users
@@ -50,8 +49,8 @@ require_relative 'helpers'
 # Restore the users from version control
   restored = sql <<~SQL
     insert into users
-    select (populate_record(null::users, col_values)).*
-    from vc_rows;
+    select vc_user.*
+    from vc_rows, populate_record(null::users, col_values) as vc_user;
 
     select * from users;
   SQL

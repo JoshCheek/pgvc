@@ -10,8 +10,8 @@ sql <<~SQL
     row_hashes character(32)[]
   );
   create table vc_rows (
-    vc_hash character(32) primary key,
-    data    hstore
+    vc_hash    character(32) primary key,
+    col_values hstore
   );
 
 
@@ -27,10 +27,9 @@ sql <<~SQL
   create function vc_hash_and_record() returns trigger as $$
     declare serialized hstore;
     begin
-      select hstore(NEW) into serialized;
-      select delete(serialized, 'vc_hash') into serialized;
+      serialized := delete(hstore(NEW), 'vc_hash');
       NEW.vc_hash = md5(serialized::text);
-      insert into vc_rows (vc_hash, data)
+      insert into vc_rows (vc_hash, col_values)
         select NEW.vc_hash, serialized
         on conflict do nothing;
       return NEW;
@@ -41,7 +40,7 @@ sql <<~SQL
     before insert or update on users
     for each row execute procedure vc_hash_and_record();
 
-  -- Save the table's row hashes
+  -- Save the table
   create function commit_table(in table_name varchar, out table_hash character(32)) as $$
     declare row_hashes character(32)[];
     begin
@@ -54,16 +53,17 @@ sql <<~SQL
         returning vc_hash into table_hash;
     end $$ language plpgsql;
 
-
+  -- Restore a previously saved table
   create function checkout_table(in table_hash character(32)) returns void as $$
     declare hashes character(32)[];
     begin
-      select row_hashes from vc_tables where vc_hash = table_hash into hashes;
+      hashes := (select row_hashes from vc_tables where vc_hash = table_hash);
       delete from users;
       insert into users
-        select (populate_record(null::users, data)).*
-        from unnest(hashes) recorded_hash
-        left join vc_rows on vc_hash = recorded_hash;
+        select vc_user.*
+        from unnest(hashes) as hash
+        left join vc_rows on vc_hash = hash
+        left join populate_record(null::users, col_values) as vc_user on true;
     end $$ language plpgsql
 SQL
 
