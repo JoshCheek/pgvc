@@ -24,17 +24,16 @@ RSpec.describe 'Figuring out what it should do' do
         colour varchar
       );
     SQL
-    users   = sql "select * from users;"
-    @user   = users.find { |u| u.name == 'josh' }
-    system  = users.find { |u| u.name == 'system' }
-    before_bootstrap
-    @client = Pgvc.bootstrap db,
-                system_userid:  system.id,
-                default_branch: 'trunk' # I dislike "master" as the default branch name
+    users  = sql "select * from users;"
+    @user  = users.find { |u| u.name == 'josh' }
+    system = users.find { |u| u.name == 'system' }
+    before_init
+    # I dislike "master" as the default branch name
+    @client = Pgvc.init db, system_userid: system.id, default_branch: 'trunk'
     @client.track_table 'products'
   end
 
-  def before_bootstrap
+  def before_init
     # noop, override in children if necessary
   end
 
@@ -79,7 +78,7 @@ RSpec.describe 'Figuring out what it should do' do
 
   # Dump as much shit into a given test as we can since they're so expensive
   describe 'initial state' do
-    def before_bootstrap
+    def before_init
       sql "insert into products (name, colour) values ('boots', 'black')"
     end
 
@@ -254,7 +253,7 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
   describe 'working on a branch' do
-    def before_bootstrap
+    def before_init
       sql "insert into products (name, colour) values ('a', 'a')"
     end
     it 'applies those changes to only that branch' do

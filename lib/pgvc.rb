@@ -8,11 +8,11 @@ class Pgvc
     File.read File.join(SQL_PATH, filename)
   end
 
-  def self.bootstrap(db, system_userid:, default_branch:)
+  def self.init(db, system_userid:, default_branch:)
     db.exec file('tables.sql')
     db.exec file('private_functions.sql')
     db.exec file('public_functions.sql')
-    new(db).tap { |pgvc| pgvc.fn 'initialize', system_userid, default_branch }
+    new(db).tap { |pgvc| pgvc.fn 'init', system_userid, default_branch }
   end
 end
 

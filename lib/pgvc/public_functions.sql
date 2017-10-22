@@ -1,5 +1,4 @@
--- TODO: rename initialize -> init
-create function vc.initialize(system_user_id integer, default_branchname varchar)
+create function vc.init(system_user_id integer, default_branchname varchar)
 returns void as $$
   declare
     root_commit    vc.commits;

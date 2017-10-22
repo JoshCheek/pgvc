@@ -37,7 +37,7 @@ db = PG.connect dbname: 'pgvc_testing'
     #     #<Record id="3" name="system">]
 
 # Add version control to the database
-  pgvc = Pgvc.bootstrap db, system_userid: system.id, default_branch: 'master'
+  pgvc = Pgvc.init db, system_userid: system.id, default_branch: 'master'
 
 # Josh is on the default branch, "master", which is in the "public" schema
   master = pgvc.get_branch josh.id
