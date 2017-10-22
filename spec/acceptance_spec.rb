@@ -266,10 +266,12 @@ RSpec.describe 'Figuring out what it should do' do
       client.create_branch_from_current 'other', user.id
       client.connection_for('trunk').exec("insert into products (name, colour) values ('b', 'b')")
       client.connection_for('other').exec("insert into products (name, colour) values ('c', 'c')")
-      trunk_products = client.connection_for('trunk').exec("select * from products").map { |r| r['name'] }
-      other_products = client.connection_for('other').exec("select * from products").map { |r| r['name'] }
-      expect(trunk_products).to eq ['a', 'b']
-      expect(other_products).to eq ['a', 'c']
+      trunk_products = client.connection_for('trunk').exec("select * from products")
+      other_products = client.connection_for('other').exec("select * from products")
+      expect(trunk_products.map { |r| r['name'] }).to eq ['a', 'b']
+      expect(other_products.map { |r| r['name'] }).to eq ['a', 'c']
+      expect([*trunk_products, *other_products].map { |r| r['vc_hash'] })
+        .to_not be_any &:nil?
     end
   end
 

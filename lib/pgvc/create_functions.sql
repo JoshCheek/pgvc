@@ -119,6 +119,19 @@ returns vc.branches as $$
         quote_ident(table_name)
       );
 
+      -- add the trigger
+      execute format(
+        $sql$
+          create trigger vc_hash_and_record_%s_%s
+          before insert or update on %s.%s
+          for each row execute procedure vc.hash_and_record_row();
+        $sql$,
+        quote_ident(branch.schema_name),
+        quote_ident(table_name),
+        quote_ident(branch.schema_name),
+        quote_ident(table_name)
+      );
+
       -- insert the rows
       table_hash := db.table_hashes->table_name;
       row_hashes := (select tables.row_hashes from vc.tables where vc_hash = table_hash);

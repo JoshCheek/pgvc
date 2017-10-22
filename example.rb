@@ -37,63 +37,81 @@ db = PG.connect dbname: 'pgvc_testing'
     #     #<Record id="3" name="system">]
 
 # Add version control to the database
-  pgvc = Pgvc.bootstrap db, system_userid: system.id, track: ['products'], default_branch: 'trunk'
+  pgvc = Pgvc.bootstrap db, system_userid: system.id, track: ['products'], default_branch: 'master'
 
-# Josh is on the default branch, "trunk", which is in the "public" schema
-  trunk = pgvc.get_branch josh.id
+# Josh is on the default branch, "master", which is in the "public" schema
+  master = pgvc.get_branch josh.id
   # => #<Record id="1"
-  #             commit_hash="c8bd3f0ff47acd5ec2fe58ad4ed14518"
-  #             name="trunk"
+  #             commit_hash="695993188132d3b2de0639dcd825d1f2"
+  #             name="master"
   #             schema_name="public"
   #             is_default="t">
 
-# The trunk is pointing at the initial commit, created by the system user
-  pgvc.get_commit trunk.commit_hash
-  # => #<Record vc_hash="c8bd3f0ff47acd5ec2fe58ad4ed14518"
+# Master is pointing at the initial commit, created by the system user
+  pgvc.get_commit master.commit_hash
+  # => #<Record vc_hash="695993188132d3b2de0639dcd825d1f2"
   #             db_hash=nil
   #             user_id="3"
   #             summary="Initial commit"
   #             description=""
-  #             created_at="2017-10-21 19:30:13.044801">
+  #             created_at="2017-10-22 07:13:42.053333">
 
 # Josh commits the boots
   pgvc.create_commit summary: 'Add pre-existing products', description: '', user_id: josh.id, created_at: Time.now
 
-# Trunk has been updated to the new commit
-  trunk  = pgvc.get_branch josh.id
-  commit = pgvc.get_commit trunk.commit_hash
-  # => #<Record vc_hash="1bafd33ecd6e5616fe9867bbe101ca04"
+# Master has been updated to the new commit
+  master = pgvc.get_branch josh.id
+  commit = pgvc.get_commit master.commit_hash
+  # => #<Record vc_hash="b890568a19a7fd5ffaaf316bb855fafb"
   #             db_hash="fdad56fe1d8185215bb1da4441c5f5b2"
   #             user_id="1"
   #             summary="Add pre-existing products"
   #             description=""
-  #             created_at="2017-10-21 19:30:13">
+  #             created_at="2017-10-22 07:13:42">
 
 # Josh makes a new branch and updates the colour of the boots
   pgvc.create_branch_from_current 'update-boots', josh.id
   pgvc.switch_branch josh.id, 'update-boots'
   pgvc.connection_for('update-boots').exec("update products set colour = 'brown'")
+  pgvc.connection_for('update-boots').exec('select * from products').to_a
+  # => [{"id"=>"1",
+  #      "name"=>"boots",
+  #      "colour"=>"brown",
+  #      "vc_hash"=>"9df1cc901a477daa1bc6f22b45225494"}]
 
-# Lucy, still on the trunk branch, makes a new branch and adds shoes
+# Lucy, still on the master branch, makes a new branch and adds shoes
   pgvc.create_branch_from_current 'add-shoes', lucy.id
   pgvc.switch_branch lucy.id, 'add-shoes'
   pgvc.connection_for('add-shoes')
       .exec("insert into products (name, colour) values ('shoes', 'white')")
-
-# What do the products look like on the different branches?
-  pgvc.connection_for('update-boots').exec('select * from products').to_a
-  # => [{"id"=>"1", "name"=>"boots", "colour"=>"brown", "vc_hash"=>nil}]
   pgvc.connection_for('add-shoes').exec('select * from products').to_a
-  # => [{"id"=>"1", "name"=>"boots", "colour"=>"black", "vc_hash"=>nil},
-  #     {"id"=>"2", "name"=>"shoes", "colour"=>"white", "vc_hash"=>nil}]
-  pgvc.connection_for('trunk').exec('select * from products').to_a
+  # => [{"id"=>"1",
+  #      "name"=>"boots",
+  #      "colour"=>"black",
+  #      "vc_hash"=>"b95fcc685e439417cae418e97366685c"},
+  #     {"id"=>"2",
+  #      "name"=>"shoes",
+  #      "colour"=>"white",
+  #      "vc_hash"=>"4e87ce327c3d158a57dd9198bd010575"}]
+
+# And the master branch reflects neither of these changes
+  pgvc.connection_for('master').exec('select * from products').to_a
   # => [{"id"=>"1",
   #      "name"=>"boots",
   #      "colour"=>"black",
   #      "vc_hash"=>"b95fcc685e439417cae418e97366685c"}]
 
 # Josh and Lucy both commit
-  pgvc.create_commit summary: 'Boots are brown', description: '', user_id: josh.id, created_at: Time.now
-  pgvc.create_commit summary: 'Add shoes', description: '', user_id: lucy.id, created_at: Time.now
+  update_boots = pgvc.create_commit summary: 'Boots are brown', description: '', user_id: josh.id, created_at: Time.now
+  add_shoes    = pgvc.create_commit summary: 'Add shoes', description: '', user_id: lucy.id, created_at: Time.now
+  pgvc.history_from update_boots.vc_hash # ~> NoMethodError: undefined method `history_from' for #<Pgvc:0x007faf23913b18>
+  # =>
+  pgvc.history_from add_shoes.vc_hash
+  # =>
 
 # Then, idk, merging or diffing or something
+
+# ~> NoMethodError
+# ~> undefined method `history_from' for #<Pgvc:0x007faf23913b18>
+# ~>
+# ~> /Users/xjxc322/code/pgvc/example.rb:78:in `<main>'
