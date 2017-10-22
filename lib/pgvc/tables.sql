@@ -36,7 +36,7 @@ create table vc.ancestry (
 );
 
 create table vc.branches (
-  id          serial primary key,
+  id          serial primary key, -- we only use this because we want it for schema names
   commit_hash character(32),
   name        varchar not null unique,
   schema_name varchar not null,

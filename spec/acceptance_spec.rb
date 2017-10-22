@@ -156,38 +156,38 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'can\'t create a branch with the same name as an existing branch' do
-      client.create_branch 'omghi'
-      expect { client.create_branch 'omghi' }
-        .to raise_error Pgvc::Branch::CannotCreate
+      client.create_branch 'omghi', user.id
+      expect { client.create_branch 'omghi', user.id }
+        .to raise_error PG::UniqueViolation
     end
 
-    it 'can\'t delete the primary branch' do
+    it 'can\'t delete the default branch' do
       expect { client.delete_branch 'trunk' }
-        .to raise_error Pgvc::Branch::CannotDelete
+        .to raise_error PG::DataException
     end
 
     it 'can create a branch pointing to an arbitrary commit'
 
     it 'remembers which branch a user is on' do
-      client.create_branch 'other'
-      expect(client.branch.name).to eq 'primary'
-      client.switch_branch 'other'
-      expect(client.branch.name).to eq 'other'
+      client.create_branch 'other', user.id
+      expect(client.get_branch(user.id).name).to eq 'trunk'
+      client.switch_branch user.id, 'other'
+      expect(client.get_branch(user.id).name).to eq 'other'
     end
 
-    it 'returns to the primary branch when it deletes the branch it is on' do
-      client.create_branch 'crnt'
-      client.create_branch 'other'
-      client.switch_branch 'crnt'
+    it 'returns a user to the primary branch when it deletes the branch it is on' do
+      client.create_branch 'crnt',  user.id
+      client.create_branch 'other', user.id
+      client.switch_branch user.id, 'crnt'
 
       # branch stays the same b/c other got deleted
-      expect(client.branch.name).to eq 'crnt'
+      expect(client.get_branch(user.id).name).to eq 'crnt'
       client.delete_branch 'other'
-      expect(client.branch.name).to eq 'crnt'
+      expect(client.get_branch(user.id).name).to eq 'crnt'
 
       # branch changes b/c crnt got deleted
       client.delete_branch 'crnt'
-      expect(client.branch.name).to eq 'primary'
+      expect(client.get_branch(user.id).name).to eq 'trunk'
     end
   end
 
@@ -228,7 +228,7 @@ RSpec.describe 'Figuring out what it should do' do
 
   describe 'history' do
     # should probably be able to set a branch at an arbitrary commit, but I'll deal w/ it later
-    it 'displays the database as it looks from a given branch' do
+    xit 'displays the database as it looks from a given branch' do
       client.create_branch 'a'
       client.create_branch 'b'
 

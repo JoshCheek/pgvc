@@ -42,13 +42,13 @@ create function vc.get_branches() returns setof vc.branches as $$
   $$ language sql;
 
 
-create function vc.create_branch_from_current(name varchar, user_ref varchar)
+create function vc.create_branch_from_user(name varchar, user_ref varchar)
   returns vc.branches as $$
   declare
     branch vc.branches;
   begin
     branch := vc.get_branch(user_ref);
-    branch := vc.create_branch(name, branch.commit_hash);
+    branch := vc.create_branch_from_commit(name, branch.commit_hash);
     return branch;
   end $$ language plpgsql;
 
@@ -58,8 +58,18 @@ create function vc.rename_branch(oldname varchar, newname varchar) returns vc.br
   $$ language sql;
 
 create function vc.delete_branch(branch_name varchar) returns vc.branches as $$
-  delete from vc.branches where branches.name = branch_name returning *
-  $$ language sql;
+  declare branch vc.branches;
+  begin
+    branch := (select branches from vc.branches where branches.name = branch_name);
+    if branch.is_default then
+      raise 'Cannot delete %, it''s the default branch, the system expects it to exist',
+            branch_name
+            using errcode = 'data_exception';
+    end if;
+    delete from vc.branches where id = branch.id;
+    return branch;
+  end
+  $$ language plpgsql;
 
 create function vc.switch_branch(_user_ref varchar, branch_name varchar, out branch vc.branches) as $$
   begin
@@ -70,7 +80,7 @@ create function vc.switch_branch(_user_ref varchar, branch_name varchar, out bra
   end $$ language plpgsql;
 
 
-create function vc.create_branch(name varchar, commit_hash character(32))
+create function vc.create_branch_from_commit(name varchar, commit_hash character(32))
 returns vc.branches as $$
   declare
     branch vc.branches;
