@@ -9,8 +9,9 @@ class Pgvc
   end
 
   def self.bootstrap(db, system_userid:, default_branch:)
-    db.exec file('create_tables.sql')
-    db.exec file('create_functions.sql')
+    db.exec file('tables.sql')
+    db.exec file('private_functions.sql')
+    db.exec file('public_functions.sql')
     new(db).tap { |pgvc| pgvc.fn 'initialize', system_userid, default_branch }
   end
 end
