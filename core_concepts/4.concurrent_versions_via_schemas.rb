@@ -10,7 +10,7 @@ sql <<~SQL
 
   create table first.users  (name varchar);
   create table second.users (name varchar);
-  create table third.users (name varchar);
+  create table third.users  (name varchar);
 
   insert into first.users  (name) VALUES ('Josh');
   insert into second.users (name) VALUES ('Ashton');
@@ -18,9 +18,9 @@ sql <<~SQL
 SQL
 
 # Three connections
-db1  = PG::Connection.new dbname: dbname
-db2  = PG::Connection.new dbname: dbname
-db3  = PG::Connection.new dbname: dbname
+db1 = PG::Connection.new dbname: dbname
+db2 = PG::Connection.new dbname: dbname
+db3 = PG::Connection.new dbname: dbname
 
 # Each connection is associated a given schema
 sql "set search_path = first",  db: db1
