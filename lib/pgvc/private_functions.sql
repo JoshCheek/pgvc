@@ -8,18 +8,20 @@ create function vc.calculate_commit_hash(c vc.commits) returns varchar(32) as $$
   )); $$ language sql;
 
 
+create function vc.hash_row(in record anyelement, out vc_row vc.rows) as $$
+  begin
+    vc_row.data    := delete(hstore(record), 'vc_hash');
+    vc_row.vc_hash := md5(vc_row.data::text);
+  end $$ language plpgsql;
+
 
 create function vc.hash_and_record_row() returns trigger as $$
   declare
-    serialized hstore;
+    vc_row vc.rows;
   begin
-    serialized := delete(hstore(NEW), 'vc_hash');
-    NEW.vc_hash = md5(serialized::text);
-
-    insert into vc.rows (vc_hash, data)
-      select NEW.vc_hash, serialized
-      on conflict do nothing;
-
+    vc_row := vc.hash_row(NEW);
+    insert into vc.rows select vc_row.* on conflict do nothing;
+    NEW.vc_hash := vc_row.vc_hash;
     return NEW;
   end $$ language plpgsql;
 
