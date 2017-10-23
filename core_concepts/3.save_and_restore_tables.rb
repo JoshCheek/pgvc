@@ -6,8 +6,8 @@ sql <<~SQL
 
   -- Version control
   create table vc_tables (
-    vc_hash    character(32) primary key,
-    row_hashes character(32)[]
+    vc_hash    character (32) primary key,
+    row_hashes character (32) []
   );
   create table vc_rows (
     vc_hash    character(32) primary key,
@@ -19,19 +19,17 @@ sql <<~SQL
   create table users (
     id      serial primary key,
     name    varchar,
-    vc_hash character(32)
+    vc_hash character (32)
   );
 
 
   -- Calculate the hash and store the record in version control
   create function vc_hash_and_record() returns trigger as $$
-    declare serialized hstore;
+    declare col_values hstore;
     begin
-      serialized := delete(hstore(NEW), 'vc_hash');
-      NEW.vc_hash = md5(serialized::text);
-      insert into vc_rows (vc_hash, col_values)
-        select NEW.vc_hash, serialized
-        on conflict do nothing;
+      col_values  := delete(hstore(NEW), 'vc_hash');
+      NEW.vc_hash := md5(col_values::text);
+      insert into vc_rows select NEW.vc_hash, col_values on conflict do nothing;
       return NEW;
     end $$ language plpgsql;
 
@@ -41,21 +39,20 @@ sql <<~SQL
     for each row execute procedure vc_hash_and_record();
 
   -- Save the table
-  create function commit_table(in table_name varchar, out table_hash character(32)) as $$
-    declare row_hashes character(32)[];
+  create function commit_table(in table_name varchar, out vc_hash character (32)) as $$
+    declare row_hashes character (32) [];
     begin
       execute
-        format('select array_agg(vc_hash) from %s;', quote_ident(table_name))
+        format('select array_agg(vc_hash) from %s', quote_ident(table_name))
         into row_hashes;
-      row_hashes := coalesce(row_hashes, '{}'); -- use empty array rather than null
-      insert into vc_tables (vc_hash, row_hashes)
-        values (md5(row_hashes::text), row_hashes)
-        returning vc_hash into table_hash;
+      row_hashes := coalesce(row_hashes, '{}');
+      vc_hash    := md5(row_hashes::text);
+      insert into vc_tables select vc_hash, row_hashes;
     end $$ language plpgsql;
 
   -- Restore a previously saved table
-  create function checkout_table(in table_hash character(32)) returns void as $$
-    declare hashes character(32)[];
+  create function checkout_table(in table_hash character (32)) returns void as $$
+    declare hashes character (32) [];
     begin
       hashes := (select row_hashes from vc_tables where vc_hash = table_hash);
       delete from users;

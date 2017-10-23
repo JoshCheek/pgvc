@@ -6,7 +6,7 @@ require_relative 'helpers'
     -- version controlled rows
     create extension hstore;
     create table vc_rows (
-      vc_hash character(32) primary key,
+      vc_hash character (32) primary key,
       col_values hstore
     );
 
@@ -14,20 +14,18 @@ require_relative 'helpers'
     create table users (
       id      serial primary key,
       name    varchar,
-      vc_hash character(32)
+      vc_hash character (32)
     );
 
     -- Calculate the hash and store the record in version control
     create function vc_hash_and_record() returns trigger as $$
-    declare serialized hstore;
-    begin
-      serialized := delete(hstore(NEW), 'vc_hash');
-      NEW.vc_hash := md5(serialized::text);
-      insert into vc_rows (vc_hash, col_values)
-        select NEW.vc_hash, serialized
-        on conflict do nothing;
-      return NEW;
-    end $$ language plpgsql;
+      declare col_values hstore;
+      begin
+        col_values  := delete(hstore(NEW), 'vc_hash');
+        NEW.vc_hash := md5(col_values::text);
+        insert into vc_rows select NEW.vc_hash, col_values on conflict do nothing;
+        return NEW;
+      end $$ language plpgsql;
 
     -- Hash and store on every insert / update
     create trigger vc_hash_and_record_tg
