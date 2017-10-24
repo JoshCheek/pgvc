@@ -1,8 +1,9 @@
-DBNAME = 'pgvc_testing'
+DBNAME = 'pgvc_testing'.freeze
 begin
   ROOT_DB = PG.connect dbname: DBNAME
 rescue PG::ConnectionBad
-  PG.connect(dbname: 'postgres').exec("create database #{DBNAME};")
+  PG.connect(dbname: 'postgres'.freeze)
+    .exec("create database #{DBNAME};")
   retry
 end
 
@@ -10,8 +11,7 @@ ROOT_DB.exec <<~SQL
   SET client_min_messages=WARNING;
 
   create or replace function reset_test_db() returns void as $$
-    declare
-      name varchar;
+    declare name varchar;
     begin
       for name in
         select schema_name from information_schema.schemata

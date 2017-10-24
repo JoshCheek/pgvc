@@ -24,9 +24,7 @@ RSpec.describe 'Figuring out what it should do' do
         colour varchar
       );
     SQL
-    users  = sql "select * from users;"
-    @user  = users.find { |u| u.name == 'josh' }
-    system = users.find { |u| u.name == 'system' }
+    @user, system  = sql "select * from users;"
     before_init
     # I dislike "master" as the default branch name
     @client = Pgvc.init db, system_user_ref: system.id, default_branch: 'trunk'
@@ -37,14 +35,13 @@ RSpec.describe 'Figuring out what it should do' do
     # noop, override in children if necessary
   end
 
-  def sql1(sql, *params)
-    sql(sql, *params).first
+  def sql1(sql, *params, **options)
+    sql(sql, *params, **options).first
   end
 
-  def sql(sql, *params)
-    db = get_db(user)
+  def sql(sql, *params, db: get_db(user))
     if params.empty?
-      db.exec sql
+      db.exec sql # prefer exec as it is more permissive
     else
       db.exec_params sql, params
     end.map { |row| Pgvc::Record.new row }

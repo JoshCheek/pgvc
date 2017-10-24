@@ -79,9 +79,7 @@ class Pgvc
   end
 
   def connection_for(branch_name)
-    branch_connections.fetch branch_name do
-      branch_connections[branch_name] = build_connection_for branch_name
-    end
+    branch_connections[branch_name] ||= build_connection_for(branch_name)
   end
 
   private
