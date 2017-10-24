@@ -15,6 +15,37 @@ create function vc.hash_row(in record anyelement, out vc_row vc.rows) as $$
   end $$ language plpgsql;
 
 
+create function vc.record_that_were_tracking(in table_name varchar) returns void as $$
+  insert into vc.tracked_tables select table_name on conflict do nothing
+  $$ language sql;
+
+
+create function vc.fire_trigger_for_rows_in(table_name varchar) returns void as $$
+  begin
+    execute format('update %s set vc_hash = vc_hash', quote_ident(table_name));
+  end $$ language plpgsql;
+
+
+create function vc.add_hash_to_table(in table_name varchar) returns void as $$
+  begin
+    execute format(
+      'alter table %s add column vc_hash character(32)',
+      quote_ident(table_name)
+    );
+  end $$ language plpgsql;
+
+
+create function vc.hash_and_record_row() returns trigger as $$
+  declare
+    vc_row vc.rows;
+  begin
+    vc_row := vc.hash_row(NEW);
+    insert into vc.rows select vc_row.* on conflict do nothing;
+    NEW.vc_hash := vc_row.vc_hash;
+    return NEW;
+  end $$ language plpgsql;
+
+
 create function vc.add_trigger(in schema_name varchar, in table_name varchar) returns void as $$
   begin
     execute format(
@@ -29,17 +60,6 @@ create function vc.add_trigger(in schema_name varchar, in table_name varchar) re
       quote_ident(table_name)
     );
   end $$ language plpgsql;
-
-create function vc.hash_and_record_row() returns trigger as $$
-  declare
-    vc_row vc.rows;
-  begin
-    vc_row := vc.hash_row(NEW);
-    insert into vc.rows select vc_row.* on conflict do nothing;
-    NEW.vc_hash := vc_row.vc_hash;
-    return NEW;
-  end $$ language plpgsql;
-
 
 
 create function vc.save_branch(in schema_name varchar) returns character(32) as $$

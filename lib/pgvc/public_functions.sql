@@ -139,19 +139,12 @@ returns vc.branches as $$
 
 -- maybe useful for reducing the time it takes?
 -- SET session_replication_role = replica;
-create function vc.track_table(tblname varchar) returns void as $$
+create function vc.track_table(table_name varchar) returns void as $$
   begin
-    -- record that we care about this table
-    insert into vc.tracked_tables (name) values (tblname) on conflict do nothing;
-
-    -- add vc_hash to the table
-    execute format('alter table %s add column vc_hash character(32)', quote_ident(tblname));
-
-    -- trigger to save its rows when they change
-    perform vc.add_trigger('public', tblname);
-
-    -- fire the trigger for rows already in the table
-    execute format('update %s set vc_hash = vc_hash', quote_ident(tblname));
+    perform vc.add_hash_to_table(table_name);
+    perform vc.add_trigger('public', table_name);
+    perform vc.fire_trigger_for_rows_in(table_name);
+    perform vc.record_that_were_tracking(table_name);
   end $$ language plpgsql;
 
 
