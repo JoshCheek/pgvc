@@ -62,3 +62,15 @@ create function vc.save_table
       on conflict (vc_hash) do nothing
       returning vc_hash into table_hash;
   end $$ language plpgsql;
+
+
+
+create function vc.get_database(commit_hash character(32)) returns vc.databases as $$
+  declare
+    cmt vc.commits;
+    db  vc.databases;
+  begin
+    cmt := vc.get_commit(commit_hash);
+    db  := (select databases from vc.databases where vc_hash = cmt.db_hash);
+    return db;
+  end $$ language plpgsql;

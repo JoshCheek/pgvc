@@ -85,7 +85,6 @@ returns vc.branches as $$
   declare
     branch vc.branches;
     db     vc.databases;
-    cmt    vc.commits;
     table_name varchar;
     table_hash varchar;
     row_hashes character(32)[];
@@ -100,11 +99,8 @@ returns vc.branches as $$
       where id = branch.id
       returning * into branch;
 
-    -- get the commit
-    cmt := (select commits from vc.commits where vc_hash = commit_hash);
-
     -- get the database
-    db := (select databases from vc.databases where vc_hash = cmt.db_hash);
+    db := vc.get_database(commit_hash);
 
     -- create the schema
     execute format('create schema %s', quote_ident(branch.schema_name));
