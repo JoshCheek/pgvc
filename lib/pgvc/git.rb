@@ -26,18 +26,30 @@ class Pgvc::Git
     fn 'log'
   end
 
-  def branch
-    fn 'branch'
+  def branch(*args)
+    fn 'branch', *args
+  end
+
+  def checkout(branch_name)
+    fn 'checkout', branch_name
   end
 
   def fn(name, *args)
     placeholders = args.map.with_index(1) { |_, i| "$#{i}" }.join(", ")
     fn_call      = "git.#{name}(#{placeholders})"
-    connection.exec_params("select * from #{fn_call};", args).map { |r| Pgvc::Record.new r }
+    exec_params "select * from #{fn_call};", args
   end
 
   def fn1(*args, &block)
     fn(*args, &block).first
+  end
+
+  def exec(sql)
+    connection.exec(sql).map { |r| Pgvc::Record.new r }
+  end
+
+  def exec_params(sql, params)
+    connection.exec_params(sql, params).map { |r| Pgvc::Record.new r }
   end
 
   private
