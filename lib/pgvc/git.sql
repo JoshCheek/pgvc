@@ -64,8 +64,8 @@ create function git.branch() returns setof git.branches as $$
   select * from git.branches order by name;
   $$ language sql;
 
-create function git.branch(variadic args varchar[]) returns vc.branches as $$
-  begin return vc.user_create_branch(args[1], git.current_user()); -- arrays start at 1, not 0
+create function git.branch(new_branch_name varchar) returns vc.branches as $$
+  begin return vc.user_create_branch(new_branch_name, git.current_user());
   end $$ language plpgsql;
 
 create function git.checkout(branch_name varchar, out branch vc.branches) as $$
