@@ -113,17 +113,7 @@ returns vc.branches as $$
       );
 
       -- add the trigger
-      execute format(
-        $sql$
-          create trigger vc_hash_and_record_%s_%s
-          before insert or update on %s.%s
-          for each row execute procedure vc.hash_and_record_row();
-        $sql$,
-        quote_ident(branch.schema_name),
-        quote_ident(table_name),
-        quote_ident(branch.schema_name),
-        quote_ident(table_name)
-      );
+      perform vc.add_trigger(branch.schema_name, table_name);
 
       -- insert the rows
       table_hash := db.table_hashes->table_name;
@@ -147,26 +137,18 @@ returns vc.branches as $$
 
 
 
+-- maybe useful for reducing the time it takes?
+-- SET session_replication_role = replica;
 create function vc.track_table(tblname varchar) returns void as $$
   begin
     -- record that we care about this table
-    insert into vc.tracked_tables (name) values (tblname)
-      on conflict do nothing;
+    insert into vc.tracked_tables (name) values (tblname) on conflict do nothing;
 
-    /* SET session_replication_role = replica; */
     -- add vc_hash to the table
     execute format('alter table %s add column vc_hash character(32)', quote_ident(tblname));
 
     -- trigger to save its rows when they change
-    execute format(
-      $sql$
-        create trigger vc_hash_and_record_%s
-        before insert or update on %s
-        for each row execute procedure vc.hash_and_record_row();
-      $sql$,
-      quote_ident(tblname),
-      quote_ident(tblname)
-    );
+    perform vc.add_trigger('public', tblname);
 
     -- fire the trigger for rows already in the table
     execute format('update %s set vc_hash = vc_hash', quote_ident(tblname));

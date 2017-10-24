@@ -15,6 +15,21 @@ create function vc.hash_row(in record anyelement, out vc_row vc.rows) as $$
   end $$ language plpgsql;
 
 
+create function vc.add_trigger(in schema_name varchar, in table_name varchar) returns void as $$
+  begin
+    execute format(
+      $sql$
+        create trigger vc_hash_and_record_%s_%s
+        before insert or update on %s.%s
+        for each row execute procedure vc.hash_and_record_row();
+      $sql$,
+      quote_ident(schema_name),
+      quote_ident(table_name),
+      quote_ident(schema_name),
+      quote_ident(table_name)
+    );
+  end $$ language plpgsql;
+
 create function vc.hash_and_record_row() returns trigger as $$
   declare
     vc_row vc.rows;
