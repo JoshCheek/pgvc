@@ -31,7 +31,8 @@ create function vc.user_get_branch(user_ref varchar) returns vc.branches as $$
     join vc.branches on (ub.branch_id = branches.id)
     where ub.user_ref = $1
   -- default for if the user has never checked out a branch
-  union all select * from vc.branches where is_default
+  union all
+  select * from vc.branches where is_default
   $$ language sql;
 
 
@@ -182,7 +183,7 @@ create function vc.create_commit
 
 
 
-create function vc.get_parents(in commit_hash character(32)) returns setof vc.commits as $$
+create function vc.get_parents(commit_hash character(32)) returns setof vc.commits as $$
   select commits.*
   from vc.ancestry
   join vc.commits on (ancestry.parent_hash = commits.vc_hash)
@@ -192,7 +193,7 @@ create function vc.get_parents(in commit_hash character(32)) returns setof vc.co
 
 
 -- action: 'create' or 'delete'
-create function vc.diff(in from_hash character(32), in to_hash character(32))
+create function vc.diff(from_hash character(32), to_hash character(32))
   returns table(action varchar, table_name varchar, hash character(32)) as $$
   begin
   end $$ language plpgsql;

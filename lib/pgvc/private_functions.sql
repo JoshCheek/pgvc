@@ -15,7 +15,7 @@ create function vc.hash_row(in record anyelement, out vc_row vc.rows) as $$
   end $$ language plpgsql;
 
 
-create function vc.record_that_were_tracking(in table_name varchar) returns void as $$
+create function vc.record_that_were_tracking(table_name varchar) returns void as $$
   insert into vc.tracked_tables select table_name on conflict do nothing
   $$ language sql;
 
@@ -26,7 +26,7 @@ create function vc.fire_trigger_for_rows_in(table_name varchar) returns void as 
   end $$ language plpgsql;
 
 
-create function vc.add_hash_to_table(in table_name varchar) returns void as $$
+create function vc.add_hash_to_table(table_name varchar) returns void as $$
   begin
     execute format(
       'alter table %s add column vc_hash character(32)',
@@ -46,7 +46,7 @@ create function vc.hash_and_record_row() returns trigger as $$
   end $$ language plpgsql;
 
 
-create function vc.add_trigger(in schema_name varchar, in table_name varchar) returns void as $$
+create function vc.add_trigger(schema_name varchar, table_name varchar) returns void as $$
   begin
     execute format(
       $sql$
@@ -62,7 +62,7 @@ create function vc.add_trigger(in schema_name varchar, in table_name varchar) re
   end $$ language plpgsql;
 
 
-create function vc.save_branch(in schema_name varchar) returns character(32) as $$
+create function vc.save_branch(schema_name varchar) returns character(32) as $$
   declare
     db vc.databases;
     table_name varchar;
@@ -83,19 +83,20 @@ create function vc.save_branch(in schema_name varchar) returns character(32) as 
 create function vc.save_table
   ( in  schema_name varchar,
     in  table_name  varchar,
-    out table_hash  character(32)
+    out table_hash  character (32)
   ) as $$
   declare row_hashes character(32)[];
   begin
-    execute format('select array_agg(vc_hash) from %s.%s;',
-                   quote_ident(schema_name),
-                   quote_ident(table_name))
-            into row_hashes;
+    execute format
+      ( 'select array_agg(vc_hash) from %s.%s;',
+        quote_ident(schema_name),
+        quote_ident(table_name)
+      ) into row_hashes;
     row_hashes := coalesce(row_hashes, '{}'); -- use empty array rather than null
-    insert into vc.tables (vc_hash, row_hashes)
-      values (md5(row_hashes::text), row_hashes)
-      on conflict (vc_hash) do nothing
-      returning vc_hash into table_hash;
+    table_hash := md5(row_hashes::text);
+    insert into vc.tables
+      select table_hash, row_hashes
+      on conflict (vc_hash) do nothing;
   end $$ language plpgsql;
 
 
