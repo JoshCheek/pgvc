@@ -24,8 +24,8 @@ class Pgvc
     self.branch_connections = {}
   end
 
-  def get_branch(user_ref)
-    fn1 'get_branch', user_ref.to_s
+  def user_get_branch(user_ref)
+    fn1 'user_get_branch', user_ref.to_s
   end
 
   def switch_branch(user_ref, branch_name)

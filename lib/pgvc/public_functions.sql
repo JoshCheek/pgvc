@@ -25,7 +25,7 @@ returns void as $$
 
 
 
-create function vc.get_branch(user_ref varchar) returns vc.branches as $$
+create function vc.user_get_branch(user_ref varchar) returns vc.branches as $$
   select branches.*
     from vc.user_branches ub
     join vc.branches on (ub.branch_id = branches.id)
@@ -43,7 +43,7 @@ create function vc.get_branches() returns setof vc.branches as $$
 
 create function vc.create_branch_from_user(name varchar, user_ref varchar) returns vc.branches as $$
   begin
-    return vc.create_branch_from_commit(name, (vc.get_branch(user_ref)).commit_hash);
+    return vc.create_branch_from_commit(name, (vc.user_get_branch(user_ref)).commit_hash);
   end $$ language plpgsql;
 
 
@@ -190,7 +190,7 @@ create function vc.create_commit
     cmt vc.commits;
     branch vc.branches;
   begin
-    branch          := vc.get_branch(user_ref);
+    branch          := vc.user_get_branch(user_ref);
     cmt.summary     := summary;
     cmt.description := description;
     cmt.user_ref    := user_ref;

@@ -52,7 +52,7 @@ RSpec.describe 'Figuring out what it should do' do
 
   def get_db(user)
     return self.db unless user && client
-    branch = client.get_branch user.id
+    branch = client.user_get_branch user.id
     client.connection_for(branch.name)
   end
 
@@ -92,7 +92,7 @@ RSpec.describe 'Figuring out what it should do' do
     it 'starts on the default branch pointing at the root commit, using the public schema, and tracks the tables' do
       # -- branch / commit --
       # user is on a branch (the default branch)
-      branch = client.get_branch user.id
+      branch = client.user_get_branch user.id
       expect(branch.name).to eq 'trunk'
 
       # the default branch corresponds to the public schema
@@ -135,9 +135,9 @@ RSpec.describe 'Figuring out what it should do' do
 
     it 'knows which branch a user is on, and allows them to switch to a different branch' do
       client.create_branch 'other', user.id
-      expect(client.get_branch(user.id).name).to eq 'trunk'
+      expect(client.user_get_branch(user.id).name).to eq 'trunk'
       client.switch_branch user.id, 'other'
-      expect(client.get_branch(user.id).name).to eq 'other'
+      expect(client.user_get_branch(user.id).name).to eq 'other'
     end
 
     xit 'creates a schema for the given branch sets its tables and rows up to match the given commit' do
@@ -177,9 +177,9 @@ RSpec.describe 'Figuring out what it should do' do
 
     it 'remembers which branch a user is on' do
       client.create_branch 'other', user.id
-      expect(client.get_branch(user.id).name).to eq 'trunk'
+      expect(client.user_get_branch(user.id).name).to eq 'trunk'
       client.switch_branch user.id, 'other'
-      expect(client.get_branch(user.id).name).to eq 'other'
+      expect(client.user_get_branch(user.id).name).to eq 'other'
     end
 
     it 'returns a user to the primary branch when it deletes the branch it is on' do
@@ -188,13 +188,13 @@ RSpec.describe 'Figuring out what it should do' do
       client.switch_branch user.id, 'crnt'
 
       # branch stays the same b/c other got deleted
-      expect(client.get_branch(user.id).name).to eq 'crnt'
+      expect(client.user_get_branch(user.id).name).to eq 'crnt'
       client.delete_branch 'other'
-      expect(client.get_branch(user.id).name).to eq 'crnt'
+      expect(client.user_get_branch(user.id).name).to eq 'crnt'
 
       # branch changes b/c crnt got deleted
       client.delete_branch 'crnt'
-      expect(client.get_branch(user.id).name).to eq 'trunk'
+      expect(client.user_get_branch(user.id).name).to eq 'trunk'
     end
   end
 
@@ -220,12 +220,12 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'makes the old commit a parent of the new commit and updates the branch' do
-      branch = client.get_branch(user.id)
+      branch = client.user_get_branch(user.id)
       prev   = client.get_commit branch.commit_hash
 
       commit = create_commit
 
-      branch = client.get_branch(user.id)
+      branch = client.user_get_branch(user.id)
       crnt   = client.get_commit branch.commit_hash
 
       expect(crnt).to eq commit
@@ -281,7 +281,7 @@ RSpec.describe 'Figuring out what it should do' do
 
   describe 'diffing returns the set of changes between two commits', t:true do
     example 'an empty commit' do
-      branch = client.get_branch user.id
+      branch = client.user_get_branch user.id
       old    = client.get_commit branch.commit_hash
       new    = create_commit
       expect(old).to_not eq new
