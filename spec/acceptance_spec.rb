@@ -5,6 +5,18 @@ require 'spec_helper'
 RSpec.describe 'Figuring out what it should do' do
   include SpecHelper::Acceptance
 
+  before do
+    before_init
+    @client = Pgvc.init db, system_user_ref: system_user.id, default_branch: 'trunk'
+    @client.track_table 'products'
+  end
+
+  attr_reader :client
+
+  def before_init
+    # noop, override if necessary
+  end
+
   def create_commit(client: self.client, **commit_options)
     commit_options[:summary]     ||= 'default summary'
     commit_options[:description] ||= 'default description'
@@ -23,7 +35,7 @@ RSpec.describe 'Figuring out what it should do' do
       # -- branch / commit --
       # user is on a branch (the default branch)
       branch = client.user_get_branch user.id
-      expect(branch.name).to eq 'master'
+      expect(branch.name).to eq 'trunk'
 
       # the default branch corresponds to the public schema
       expect(branch.schema_name).to eq 'public'
@@ -56,16 +68,16 @@ RSpec.describe 'Figuring out what it should do' do
   describe 'branches' do
     it 'can create, rename, and delete branches' do
       client.user_create_branch 'omghi', user.id
-      expect(client.get_branches.map(&:name).sort).to eq ['master', 'omghi']
+      expect(client.get_branches.map(&:name).sort).to eq ['omghi', 'trunk']
       client.rename_branch 'omghi', 'lolol'
-      expect(client.get_branches.map(&:name).sort).to eq ['lolol', 'master']
+      expect(client.get_branches.map(&:name).sort).to eq ['lolol', 'trunk']
       client.delete_branch 'lolol'
-      expect(client.get_branches.map(&:name).sort).to eq ['master']
+      expect(client.get_branches.map(&:name).sort).to eq ['trunk']
     end
 
     it 'knows which branch a user is on, and allows them to switch to a different branch' do
       client.user_create_branch 'other', user.id
-      expect(client.user_get_branch(user.id).name).to eq 'master'
+      expect(client.user_get_branch(user.id).name).to eq 'trunk'
       client.switch_branch user.id, 'other'
       expect(client.user_get_branch(user.id).name).to eq 'other'
     end
@@ -88,7 +100,7 @@ RSpec.describe 'Figuring out what it should do' do
       client.switch_branch user.id, name
       sql "insert into products (name, colour) values ('a','a')"
       assert_products name: %w[a]
-      client.switch_branch user.id, 'master'
+      client.switch_branch user.id, 'trunk'
       assert_products name: %w[]
     end
 
@@ -99,7 +111,7 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'can\'t delete the default branch' do
-      expect { client.delete_branch 'master' }
+      expect { client.delete_branch 'trunk' }
         .to raise_error PG::DataException
     end
 
@@ -107,7 +119,7 @@ RSpec.describe 'Figuring out what it should do' do
 
     it 'remembers which branch a user is on' do
       client.user_create_branch 'other', user.id
-      expect(client.user_get_branch(user.id).name).to eq 'master'
+      expect(client.user_get_branch(user.id).name).to eq 'trunk'
       client.switch_branch user.id, 'other'
       expect(client.user_get_branch(user.id).name).to eq 'other'
     end
@@ -124,7 +136,7 @@ RSpec.describe 'Figuring out what it should do' do
 
       # branch changes b/c crnt got deleted
       client.delete_branch 'crnt'
-      expect(client.user_get_branch(user.id).name).to eq 'master'
+      expect(client.user_get_branch(user.id).name).to eq 'trunk'
     end
   end
 
@@ -198,9 +210,9 @@ RSpec.describe 'Figuring out what it should do' do
     it 'applies those changes to only that branch' do
       create_commit
       client.user_create_branch 'other', user.id
-      client.connection_for('master').exec("insert into products (name, colour) values ('b', 'b')")
+      client.connection_for('trunk').exec("insert into products (name, colour) values ('b', 'b')")
       client.connection_for('other').exec("insert into products (name, colour) values ('c', 'c')")
-      master_products = client.connection_for('master').exec("select * from products")
+      master_products = client.connection_for('trunk').exec("select * from products")
       other_products = client.connection_for('other').exec("select * from products")
       expect(master_products.map { |r| r['name'] }).to eq ['a', 'b']
       expect(other_products.map { |r| r['name'] }).to eq ['a', 'c']

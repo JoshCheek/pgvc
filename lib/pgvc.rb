@@ -8,16 +8,20 @@ class Pgvc
     File.read File.join(SQL_PATH, filename)
   end
 
-  def self.init(db, system_user_ref:, default_branch:)
+  def self.load_files(db)
     db.exec file('tables.sql')
     db.exec file('private_functions.sql')
     db.exec file('public_functions.sql')
+    db.exec file('git.sql')
+  end
+
+  def self.init(db, system_user_ref:, default_branch:)
+    load_files db
     new(db).tap { |pgvc| pgvc.fn 'init', system_user_ref.to_s, default_branch }
   end
 end
 
 
-require 'pg'
 class Pgvc
   def initialize(db)
     self.connection = db
@@ -26,6 +30,10 @@ class Pgvc
 
   def user_get_branch(user_ref)
     fn1 'user_get_branch', user_ref.to_s
+  end
+
+  def get_branch(name)
+    fn1 'get_branch', name
   end
 
   def switch_branch(user_ref, branch_name)

@@ -21,6 +21,7 @@ ROOT_DB.exec <<~SQL
         end if;
       end loop;
       drop schema if exists vc cascade;
+      drop schema if exists git cascade;
       drop table if exists users;
       drop table if exists products;
     end $$ language plpgsql;
@@ -50,19 +51,12 @@ module SpecHelper
               colour varchar
             );
           SQL
-          @user, system  = sql "select * from users;"
-          before_init
-          @client = Pgvc.init db, system_user_ref: system, default_branch:  'master'
-          @client.track_table 'products'
+          @user, @system_user = sql "select * from users;"
         end
       end
     end
 
-    attr_reader :db, :client, :user
-
-    def before_init
-      # noop, override in children if necessary
-    end
+    attr_reader :db, :user, :system_user
 
     def sql1(sql, *params, **options)
       sql(sql, *params, **options).first
