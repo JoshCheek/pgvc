@@ -3,55 +3,7 @@ require 'pgvc'
 require 'spec_helper'
 
 RSpec.describe 'Figuring out what it should do' do
-  attr_reader :db, :client, :user
-
-  before { ROOT_DB.exec 'select reset_test_db()' }
-
-  before do
-    @db = PG.connect dbname: DBNAME
-    db.exec <<~SQL
-      SET client_min_messages=WARNING;
-
-      create table users (
-        id serial primary key,
-        name varchar
-      );
-      insert into users (name) values ('system'), ('josh');
-
-      create table products (
-        id serial primary key,
-        name varchar,
-        colour varchar
-      );
-    SQL
-    @user, system  = sql "select * from users;"
-    before_init
-    # I dislike "master" as the default branch name
-    @client = Pgvc.init db, system_user_ref: system.id, default_branch: 'trunk'
-    @client.track_table 'products'
-  end
-
-  def before_init
-    # noop, override in children if necessary
-  end
-
-  def sql1(sql, *params, **options)
-    sql(sql, *params, **options).first
-  end
-
-  def sql(sql, *params, db: get_db(user))
-    if params.empty?
-      db.exec sql # prefer exec as it is more permissive
-    else
-      db.exec_params sql, params
-    end.map { |row| Pgvc::Record.new row }
-  end
-
-  def get_db(user)
-    return self.db unless user && client
-    branch = client.user_get_branch user.id
-    client.connection_for(branch.name)
-  end
+  include SpecHelper::Acceptance
 
   def create_commit(client: self.client, **commit_options)
     commit_options[:summary]     ||= 'default summary'
@@ -60,25 +12,6 @@ RSpec.describe 'Figuring out what it should do' do
     commit_options[:created_at]  ||= Time.now
     client.create_commit commit_options
   end
-
-  def insert_products(products, client: self.client)
-    products.each do |key, value|
-      sql 'insert into products (name, colour) values ($1, $2)', key, value
-    end
-  end
-
-  def assert_products(assertions, client: self.client)
-    results = sql('select * from products')
-    assertions.each do |key, values|
-      expect(pluck results, key).to eq values
-    end
-  end
-
-  def pluck(records, key)
-    records.map { |record| record[key] }
-  end
-
-
 
   # Dump as much shit into a given test as we can since they're so expensive
   describe 'initial state' do
@@ -90,7 +23,7 @@ RSpec.describe 'Figuring out what it should do' do
       # -- branch / commit --
       # user is on a branch (the default branch)
       branch = client.user_get_branch user.id
-      expect(branch.name).to eq 'trunk'
+      expect(branch.name).to eq 'master'
 
       # the default branch corresponds to the public schema
       expect(branch.schema_name).to eq 'public'
@@ -123,16 +56,16 @@ RSpec.describe 'Figuring out what it should do' do
   describe 'branches' do
     it 'can create, rename, and delete branches' do
       client.user_create_branch 'omghi', user.id
-      expect(client.get_branches.map(&:name).sort).to eq ['omghi', 'trunk']
+      expect(client.get_branches.map(&:name).sort).to eq ['master', 'omghi']
       client.rename_branch 'omghi', 'lolol'
-      expect(client.get_branches.map(&:name).sort).to eq ['lolol', 'trunk']
+      expect(client.get_branches.map(&:name).sort).to eq ['lolol', 'master']
       client.delete_branch 'lolol'
-      expect(client.get_branches.map(&:name).sort).to eq ['trunk']
+      expect(client.get_branches.map(&:name).sort).to eq ['master']
     end
 
     it 'knows which branch a user is on, and allows them to switch to a different branch' do
       client.user_create_branch 'other', user.id
-      expect(client.user_get_branch(user.id).name).to eq 'trunk'
+      expect(client.user_get_branch(user.id).name).to eq 'master'
       client.switch_branch user.id, 'other'
       expect(client.user_get_branch(user.id).name).to eq 'other'
     end
@@ -155,7 +88,7 @@ RSpec.describe 'Figuring out what it should do' do
       client.switch_branch user.id, name
       sql "insert into products (name, colour) values ('a','a')"
       assert_products name: %w[a]
-      client.switch_branch user.id, 'trunk'
+      client.switch_branch user.id, 'master'
       assert_products name: %w[]
     end
 
@@ -166,7 +99,7 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'can\'t delete the default branch' do
-      expect { client.delete_branch 'trunk' }
+      expect { client.delete_branch 'master' }
         .to raise_error PG::DataException
     end
 
@@ -174,7 +107,7 @@ RSpec.describe 'Figuring out what it should do' do
 
     it 'remembers which branch a user is on' do
       client.user_create_branch 'other', user.id
-      expect(client.user_get_branch(user.id).name).to eq 'trunk'
+      expect(client.user_get_branch(user.id).name).to eq 'master'
       client.switch_branch user.id, 'other'
       expect(client.user_get_branch(user.id).name).to eq 'other'
     end
@@ -191,7 +124,7 @@ RSpec.describe 'Figuring out what it should do' do
 
       # branch changes b/c crnt got deleted
       client.delete_branch 'crnt'
-      expect(client.user_get_branch(user.id).name).to eq 'trunk'
+      expect(client.user_get_branch(user.id).name).to eq 'master'
     end
   end
 
@@ -265,13 +198,13 @@ RSpec.describe 'Figuring out what it should do' do
     it 'applies those changes to only that branch' do
       create_commit
       client.user_create_branch 'other', user.id
-      client.connection_for('trunk').exec("insert into products (name, colour) values ('b', 'b')")
+      client.connection_for('master').exec("insert into products (name, colour) values ('b', 'b')")
       client.connection_for('other').exec("insert into products (name, colour) values ('c', 'c')")
-      trunk_products = client.connection_for('trunk').exec("select * from products")
+      master_products = client.connection_for('master').exec("select * from products")
       other_products = client.connection_for('other').exec("select * from products")
-      expect(trunk_products.map { |r| r['name'] }).to eq ['a', 'b']
+      expect(master_products.map { |r| r['name'] }).to eq ['a', 'b']
       expect(other_products.map { |r| r['name'] }).to eq ['a', 'c']
-      expect([*trunk_products, *other_products].map { |r| r['vc_hash'] })
+      expect([*master_products, *other_products].map { |r| r['vc_hash'] })
         .to_not be_any &:nil?
     end
   end
