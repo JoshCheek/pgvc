@@ -30,9 +30,8 @@ create function vc.get_branch(user_ref varchar) returns vc.branches as $$
     from vc.user_branches ub
     join vc.branches on (ub.branch_id = branches.id)
     where ub.user_ref = $1
-  union all
   -- default for if the user has never checked out a branch
-  select * from vc.branches where is_default
+  union all select * from vc.branches where is_default
   $$ language sql;
 
 
@@ -42,14 +41,9 @@ create function vc.get_branches() returns setof vc.branches as $$
   $$ language sql;
 
 
-create function vc.create_branch_from_user(name varchar, user_ref varchar)
-  returns vc.branches as $$
-  declare
-    branch vc.branches;
+create function vc.create_branch_from_user(name varchar, user_ref varchar) returns vc.branches as $$
   begin
-    branch := vc.get_branch(user_ref);
-    branch := vc.create_branch_from_commit(name, branch.commit_hash);
-    return branch;
+    return vc.create_branch_from_commit(name, (vc.get_branch(user_ref)).commit_hash);
   end $$ language plpgsql;
 
 
@@ -70,6 +64,7 @@ create function vc.delete_branch(branch_name varchar) returns vc.branches as $$
     return branch;
   end
   $$ language plpgsql;
+
 
 create function vc.switch_branch(_user_ref varchar, branch_name varchar, out branch vc.branches) as $$
   begin
@@ -158,6 +153,7 @@ create function vc.track_table(tblname varchar) returns void as $$
     insert into vc.tracked_tables (name) values (tblname)
       on conflict do nothing;
 
+    /* SET session_replication_role = replica; */
     -- add vc_hash to the table
     execute format('alter table %s add column vc_hash character(32)', quote_ident(tblname));
 
