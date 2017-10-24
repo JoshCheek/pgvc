@@ -52,8 +52,8 @@ class Pgvc
     fn 'get_parents', commit_hash
   end
 
-  def create_branch(name, user_ref)
-    fn1 'create_branch_from_user', name, user_ref.to_s
+  def user_create_branch(name, user_ref)
+    fn1 'user_create_branch', name, user_ref.to_s
   end
 
   def delete_branch(name)

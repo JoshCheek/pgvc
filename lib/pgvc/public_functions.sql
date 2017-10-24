@@ -41,12 +41,6 @@ create function vc.get_branches() returns setof vc.branches as $$
   $$ language sql;
 
 
-create function vc.create_branch_from_user(name varchar, user_ref varchar) returns vc.branches as $$
-  begin
-    return vc.create_branch_from_commit(name, (vc.user_get_branch(user_ref)).commit_hash);
-  end $$ language plpgsql;
-
-
 create function vc.rename_branch(oldname varchar, newname varchar) returns vc.branches as $$
   update vc.branches set name = newname where name = oldname returning *
   $$ language sql;
@@ -75,7 +69,13 @@ create function vc.switch_branch(_user_ref varchar, branch_name varchar, out bra
   end $$ language plpgsql;
 
 
-create function vc.create_branch_from_commit(name varchar, commit_hash character(32))
+create function vc.user_create_branch(name varchar, user_ref varchar) returns vc.branches as $$
+  begin
+    return vc.branch_create_branch(name, (vc.user_get_branch(user_ref)).commit_hash);
+  end $$ language plpgsql;
+
+
+create function vc.branch_create_branch(name varchar, commit_hash character(32))
 returns vc.branches as $$
   declare
     branch vc.branches;

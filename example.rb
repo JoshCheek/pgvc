@@ -73,7 +73,7 @@ db = PG.connect dbname: 'pgvc_testing'
   #             created_at="2017-10-23 21:24:17">
 
 # Josh makes a new branch and updates the colour of the boots
-  pgvc.create_branch 'update-boots', josh.id
+  pgvc.user_create_branch 'update-boots', josh.id
   pgvc.switch_branch josh.id, 'update-boots'
   pgvc.connection_for('update-boots').exec("update products set colour = 'brown'")
   pgvc.connection_for('update-boots').exec('select * from products').to_a
@@ -83,7 +83,7 @@ db = PG.connect dbname: 'pgvc_testing'
   #      "vc_hash"=>"9df1cc901a477daa1bc6f22b45225494"}]
 
 # Lucy, still on the master branch, makes a new branch and adds shoes
-  pgvc.create_branch 'add-shoes', lucy.id
+  pgvc.user_create_branch 'add-shoes', lucy.id
   pgvc.switch_branch lucy.id, 'add-shoes'
   pgvc.connection_for('add-shoes')
       .exec("insert into products (name, colour) values ('shoes', 'white')")

@@ -125,7 +125,7 @@ RSpec.describe 'Figuring out what it should do' do
 
   describe 'branches' do
     it 'can create, rename, and delete branches' do
-      client.create_branch 'omghi', user.id
+      client.user_create_branch 'omghi', user.id
       expect(client.get_branches.map(&:name).sort).to eq ['omghi', 'trunk']
       client.rename_branch 'omghi', 'lolol'
       expect(client.get_branches.map(&:name).sort).to eq ['lolol', 'trunk']
@@ -134,7 +134,7 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'knows which branch a user is on, and allows them to switch to a different branch' do
-      client.create_branch 'other', user.id
+      client.user_create_branch 'other', user.id
       expect(client.user_get_branch(user.id).name).to eq 'trunk'
       client.switch_branch user.id, 'other'
       expect(client.user_get_branch(user.id).name).to eq 'other'
@@ -143,18 +143,18 @@ RSpec.describe 'Figuring out what it should do' do
     xit 'creates a schema for the given branch sets its tables and rows up to match the given commit' do
       sql "insert into products (name, colour) values ('boots', 'black')"
       commit1 = create_commit summary: 'boots', user_ref: user.id
-      client.create_branch 'boots', user.id
+      client.user_create_branch 'boots', user.id
 
       sql "insert into products (name, colour) values ('shoes', 'blue')"
       commit2 = create_commit summary: 'boots and shoes', user_ref: user.id
-      client.create_branch 'boots+shoes', user.id
+      client.user_create_branch 'boots+shoes', user.id
 
-      client.create_branch 'mahbrnach', user.id
+      client.user_create_branch 'mahbrnach', user.id
     end
 
     it 'can have crazy branch names (spaces, commas, etc)' do
       name = %q_abc[]{}"' ~!@\#$%^&*()+_
-      client.create_branch name, user.id
+      client.user_create_branch name, user.id
       client.switch_branch user.id, name
       sql "insert into products (name, colour) values ('a','a')"
       assert_products name: %w[a]
@@ -163,8 +163,8 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'can\'t create a branch with the same name as an existing branch' do
-      client.create_branch 'omghi', user.id
-      expect { client.create_branch 'omghi', user.id }
+      client.user_create_branch 'omghi', user.id
+      expect { client.user_create_branch 'omghi', user.id }
         .to raise_error PG::UniqueViolation
     end
 
@@ -176,15 +176,15 @@ RSpec.describe 'Figuring out what it should do' do
     it 'can create a branch pointing to an arbitrary commit'
 
     it 'remembers which branch a user is on' do
-      client.create_branch 'other', user.id
+      client.user_create_branch 'other', user.id
       expect(client.user_get_branch(user.id).name).to eq 'trunk'
       client.switch_branch user.id, 'other'
       expect(client.user_get_branch(user.id).name).to eq 'other'
     end
 
     it 'returns a user to the primary branch when it deletes the branch it is on' do
-      client.create_branch 'crnt',  user.id
-      client.create_branch 'other', user.id
+      client.user_create_branch 'crnt',  user.id
+      client.user_create_branch 'other', user.id
       client.switch_branch user.id, 'crnt'
 
       # branch stays the same b/c other got deleted
@@ -236,8 +236,8 @@ RSpec.describe 'Figuring out what it should do' do
   describe 'history' do
     # should probably be able to set a branch at an arbitrary commit, but I'll deal w/ it later
     it 'displays the database as it looks from a given branch' do
-      client.create_branch 'a', user.id
-      client.create_branch 'b', user.id
+      client.user_create_branch 'a', user.id
+      client.user_create_branch 'b', user.id
 
       client.switch_branch user.id, 'a'
       insert_products product_a: 'colour_a'
@@ -248,7 +248,7 @@ RSpec.describe 'Figuring out what it should do' do
       insert_products product_b: 'colour_b'
       create_commit
 
-      client.create_branch 'c', user.id
+      client.user_create_branch 'c', user.id
       client.switch_branch user.id, 'c'
       get_db(user).exec "update products set colour = 'colour_c' where name = 'product_b'"
 
@@ -267,7 +267,7 @@ RSpec.describe 'Figuring out what it should do' do
     end
     it 'applies those changes to only that branch' do
       create_commit
-      client.create_branch 'other', user.id
+      client.user_create_branch 'other', user.id
       client.connection_for('trunk').exec("insert into products (name, colour) values ('b', 'b')")
       client.connection_for('other').exec("insert into products (name, colour) values ('c', 'c')")
       trunk_products = client.connection_for('trunk').exec("select * from products")
