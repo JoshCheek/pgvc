@@ -23,19 +23,18 @@ create function git.add_table(name varchar) returns void as $$
   end $$ language plpgsql;
 
 create function git.init() returns void as $$
-  begin -- noop :P
-  end $$ language plpgsql;
+  begin end $$ language plpgsql; -- noop :P
 
 create function git.commit(message varchar) returns vc.commits as $$
-  begin return vc.create_commit(
-    message,
-    ''::text,
-    current_setting('git.user_ref'),
-    now()::timestamp
-  );
+  begin
+    return vc.create_commit(
+      message,
+      ''::text,
+      current_setting('git.user_ref'),
+      now()::timestamp
+    );
   end $$ language plpgsql;
 
--- FIXME: needs to actually look at the history
 create function git.log() returns setof vc.commits as $$
   with
     recursive ancestors (depth, vc_hash) AS (
@@ -77,4 +76,3 @@ create function git.checkout(branch_name varchar, out branch vc.branches) as $$
       execute format('set search_path = %s,public;', quote_ident(branch.schema_name));
     end if;
   end $$ language plpgsql;
-
