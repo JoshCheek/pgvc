@@ -9,6 +9,7 @@ returns void as $$
     root_commit.summary     := 'Initial commit';
     root_commit.description := '';
     root_commit.created_at  := now();
+    root_commit.db_hash     := vc.save_branch('public'); -- FIXME: Nothing tests this
     root_commit.vc_hash     := vc.calculate_commit_hash(root_commit);
     insert into vc.commits select root_commit.*;
 
@@ -223,7 +224,7 @@ create function vc.diff_databases(from_hash character(32), to_hash character(32)
 
 create function vc.diff_tables(from_tables hstore, to_tables hstore) returns setof vc.diff as $$
   declare
-    changed_tables varchar[] := akeys(from_tables-to_tables); -- FIXME: probably wrong, eg in the case of added but not committed tables
+    changed_tables varchar[] := akeys((from_tables-to_tables)||(to_tables-from_tables)); -- FIXME: no tests on the bidirectionality of this
     table_name     varchar;
   begin
     foreach table_name in array changed_tables

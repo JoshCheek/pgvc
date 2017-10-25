@@ -19,7 +19,7 @@ class Pgvc::Git
   end
 
   def commit(message)
-    fn 'commit', message
+    fn1 'commit', message
   end
 
   def log

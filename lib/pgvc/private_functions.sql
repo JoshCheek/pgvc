@@ -72,6 +72,7 @@ create function vc.save_branch(schema_name varchar) returns character(32) as $$
         array_agg(name),
         array_agg(vc.save_table(schema_name, name))
       ) from vc.tracked_tables);
+    db.table_hashes := coalesce(db.table_hashes, '');
     db.vc_hash := md5(db.table_hashes::text);
     insert into vc.databases select db.* on conflict do nothing;
     return db.vc_hash;

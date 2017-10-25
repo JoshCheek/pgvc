@@ -103,3 +103,27 @@ create function git.diff() returns setof vc.diff as $$
     current_hash := vc.save_branch(branch.schema_name);
     return query select * from vc.diff_databases(vccommit.db_hash, current_hash);
   end $$ language plpgsql;
+
+
+create function git.diff(ref varchar) returns setof vc.diff as $$
+  declare
+    crnt_branch  vc.branches;
+    other_branch vc.branches;
+    other_commit vc.commits;
+    current_hash character(32);
+  begin
+    crnt_branch  := git.current_branch();
+    current_hash := vc.save_branch(crnt_branch.schema_name);
+
+    other_branch := (select branches from vc.branches where name = ref);
+    if other_branch is not null then
+      other_commit := (select commits from vc.commits where commits.vc_hash = other_branch.commit_hash);
+    else
+      other_commit := (select commits from vc.commits where commits.vc_hash = ref);
+    end if;
+    raise warning 'ref:          %', ref;
+    raise warning 'current_hash: %', current_hash;
+    raise warning 'other_branch: %', other_branch;
+    raise warning 'other_commit: %', other_commit;
+    return query select * from vc.diff_databases(other_commit.db_hash, current_hash);
+  end $$ language plpgsql;

@@ -26,7 +26,7 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     git.add_table 'products'
 
     # git commit -m 'Add pre-existing products'
-    git.commit 'Add pre-existing products'
+    commit1 = git.commit 'Add pre-existing products'
 
     # git log # one commit: 'Add pre-existing products'
     messages = git.log
@@ -70,7 +70,8 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     git.diff # FIXME: this is nothing more than a smoke test at present
 
     # git commit -m 'Add white shoes'
-    git.commit 'Add white shoes'
+    commit2 = git.commit 'Add white shoes'
+    git.diff commit1.vc_hash # FIXME: just another smoke test
 
     # git log # two commits: 'Add white shoes', 'Add pre-existing products'
     expect(git.log.map(&:summary)).to eq ['Add white shoes', 'Add pre-existing products', 'Initial commit']
