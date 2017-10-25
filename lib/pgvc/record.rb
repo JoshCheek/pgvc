@@ -1,7 +1,9 @@
 class Pgvc
   class Record
     def initialize(result_hash)
-      @hash = result_hash.map { |k, v| [k.intern, v] }.to_h
+      @hash = result_hash.map do |k, v|
+        [k.intern, normalize_value(k, v)]
+      end.to_h
     end
 
     def to_h
@@ -20,11 +22,7 @@ class Pgvc
       if @hash.key? name
         @hash.fetch name
       elsif name =~ /^(.*)\?$/ && @hash.key?(:"is_#$1")
-        case result = @hash.fetch(:"is_#$1")
-        when 'f', '0', 0, false then false
-        when 't', '1', 1, true  then true
-        else result
-        end
+        @hash.fetch :"is_#$1"
       else
         super
       end
@@ -49,6 +47,17 @@ class Pgvc
         end
       end
       pp.text '>'
+    end
+
+    private
+
+    def normalize_value(key, value)
+      return value unless key =~ /^is_(.+)$/
+      case value
+      when 'f', '0' then false
+      when 't', '1' then true
+      else value
+      end
     end
   end
 end
