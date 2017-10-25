@@ -72,8 +72,8 @@ class Pgvc
     fn 'track_table', name
   end
 
-  def diff(from_hash, to_hash)
-    fn 'diff', from_hash, to_hash
+  def diff_commits(from_hash, to_hash)
+    fn 'diff_commits', from_hash, to_hash
   end
 
   def fn(name, *args)

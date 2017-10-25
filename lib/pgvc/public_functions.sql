@@ -173,7 +173,11 @@ create function vc.create_commit
     cmt.created_at  := created_at;
     cmt.db_hash     := vc.save_branch(branch.schema_name);
     cmt.vc_hash     := vc.calculate_commit_hash(cmt);
-    insert into vc.commits select cmt.*;
+    -- FIXME: iffy, its conflicting b/c it doesn't encode its parents hashes within it
+    insert into vc.commits select cmt.*
+      on conflict do nothing;
+    -- FIXME: if the above conflicted, then we shouldn't double-add its parent
+    -- get a test to show this, and then, also, assert the uniqueness of the join table
     insert into vc.ancestry (parent_hash, child_hash)
       values (branch.commit_hash, cmt.vc_hash);
     update vc.branches set commit_hash = cmt.vc_hash where id = branch.id;
@@ -193,7 +197,39 @@ create function vc.get_parents(commit_hash character(32)) returns setof vc.commi
 
 
 -- action: 'create' or 'delete'
-create function vc.diff(from_hash character(32), to_hash character(32))
-  returns table(action varchar, table_name varchar, hash character(32)) as $$
+create function vc.diff_commits(from_hash character(32), to_hash character(32))
+  returns table(action varchar, "table" varchar, vc_hash character(32)) as $$
+  declare
+    from_commit     vc.commits;
+    to_commit       vc.commits;
+    from_db         vc.databases;
+    to_db           vc.databases;
+    hl              hstore;
+    hr              hstore;
+    mismatched_keys text[];
+    al              character(32)[];
+    ar              character(32)[];
+    key             varchar;
   begin
+    from_commit     := (select c from vc.commits c where c.vc_hash = from_hash);
+    to_commit       := (select c from vc.commits c where c.vc_hash = to_hash);
+    from_db         := (select d from vc.databases d where d.vc_hash = from_commit.db_hash);
+    to_db           := (select d from vc.databases d where d.vc_hash = to_commit.db_hash);
+    hl              := from_db.table_hashes;
+    hr              := to_db.table_hashes;
+    mismatched_keys := akeys(hl-hr);
+    foreach key in array
+      mismatched_keys
+    loop
+      al := (select row_hashes from vc.tables where tables.vc_hash = hl->key);
+      ar := (select row_hashes from vc.tables where tables.vc_hash = hr->key);
+      return query with
+        lhs as (select unnest(al) as vc_hash),
+        rhs as (select unnest(ar) as vc_hash),
+        lhs_only as (select lhs.vc_hash from lhs left  join rhs on (lhs = rhs) where rhs is null),
+        rhs_only as (select rhs.vc_hash from lhs right join rhs on (lhs = rhs) where lhs is null)
+        select 'delete'::varchar, key::varchar, lhs_only.vc_hash::character(32) from lhs_only
+        union all
+        select 'insert'::varchar, key::varchar, rhs_only.vc_hash::character(32) from rhs_only;
+    end loop;
   end $$ language plpgsql;

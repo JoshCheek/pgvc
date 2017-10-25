@@ -223,17 +223,35 @@ RSpec.describe 'Figuring out what it should do' do
 
   describe 'diffing returns the set of changes between two commits', t:true do
     example 'an empty commit' do
-      branch = client.user_get_branch user.id
-      old    = client.get_commit branch.commit_hash
-      new    = create_commit
-      expect(old).to_not eq new
-      diff = client.diff old.vc_hash, new.vc_hash
-      expect(diff).to eq []
+      old = create_commit
+      new = create_commit
+      expect(client.diff_commits old.vc_hash, new.vc_hash).to eq []
     end
 
-    example 'insertions'
-    example 'deletions'
-    example 'updates'
+    example 'insertions/deletions' do
+      branch = client.user_get_branch user.id
+      insert_products product_a: 'colour_a'
+      insert_products product_b: 'colour_b'
+      old    = create_commit
+      product_a = sql1 "select * from products where name = 'product_a'"
+      db.exec "delete from products where name = 'product_a'"
+      insert_products product_c: 'colour_c'
+      new    = create_commit
+      product_c = sql1 "select * from products where name = 'product_c'"
+
+      # delete a, add c
+      expect(client.diff_commits old.vc_hash, new.vc_hash).to eq [
+        Pgvc::Record.new(action: 'delete', table: 'products', vc_hash: product_a.vc_hash),
+        Pgvc::Record.new(action: 'insert', table: 'products', vc_hash: product_c.vc_hash),
+      ]
+      # delete c, add a
+      expect(client.diff_commits new.vc_hash, old.vc_hash).to eq [
+        Pgvc::Record.new(action: 'delete', table: 'products', vc_hash: product_c.vc_hash),
+        Pgvc::Record.new(action: 'insert', table: 'products', vc_hash: product_a.vc_hash),
+      ]
+    end
+
+    example 'updates are an insertion + a deletion (currently, anyway)'
     example 'inserting and then deleting has no diff'
     example 'inserting and updating is just inserting'
     example 'updating and updating is just updating (for whichever came last)'
