@@ -87,4 +87,16 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     # git log # one commit: 'Add pre-existing products'
     expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
   end
+
+
+  it 'has git style errors' do
+    git.config_user_ref 'Josh Cheek'
+
+    # branch
+    git.branch('b1')
+    expect { git.branch('b1') }.to raise_error PG::UniqueViolation, /A branch named 'b1' already exists/
+
+    # checkout
+    expect { git.checkout('dne') }.to raise_error PG::NoDataFound, /'dne' did not match any branches known to pgvc/
+  end
 end

@@ -64,15 +64,18 @@ create function git.branch() returns setof git.branches as $$
   $$ language sql;
 
 create function git.branch(new_branch_name varchar) returns vc.branches as $$
-  begin return vc.user_create_branch(new_branch_name, git.current_user());
+  begin
+    return vc.user_create_branch(new_branch_name, git.current_user());
+  exception when unique_violation then
+    raise 'A branch named ''%'' already exists.', new_branch_name
+          using errcode = 'unique_violation';
   end $$ language plpgsql;
 
 create function git.checkout(branch_name varchar, out branch vc.branches) as $$
   begin
     branch := vc.switch_branch(git.current_user(), branch_name);
-    if branch.is_default then
-      execute format('set search_path = %s;', quote_ident(branch.schema_name));
-    else
-      execute format('set search_path = %s,public;', quote_ident(branch.schema_name));
-    end if;
+    execute format('set search_path = %s,public;', quote_ident(branch.schema_name));
+  exception when syntax_error then
+    raise '''%'' did not match any branches known to pgvc', branch_name
+          using errcode = 'no_data_found';
   end $$ language plpgsql;
