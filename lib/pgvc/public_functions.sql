@@ -196,31 +196,55 @@ create function vc.get_parents(commit_hash character(32)) returns setof vc.commi
 
 
 
--- action: 'create' or 'delete'
-create function vc.diff_commits(from_hash character(32), to_hash character(32))
-  returns table(action varchar, table_name varchar, vc_hash character(32)) as $$
-  declare
-    fdb          character(32) := (select db_hash      from vc.commits   c where c.vc_hash = from_hash);
-    tdb          character(32) := (select db_hash      from vc.commits   c where c.vc_hash = to_hash);
-    ftables      hstore        := (select table_hashes from vc.databases d where d.vc_hash = fdb);
-    ttables      hstore        := (select table_hashes from vc.databases d where d.vc_hash = tdb);
-    changed_keys varchar[]     := akeys(ftables-ttables);
-    key          varchar;
-    frows        character(32)[];
-    trows        character(32)[];
+create type vc.diff as (
+  action     varchar, -- 'create' or 'delete'
+  table_name varchar,
+  vc_hash    character(32)
+);
+
+
+create function vc.diff_commits(from_hash character(32), to_hash character(32)) returns setof vc.diff as $$
   begin
-    foreach key in array
-      changed_keys
+    return query select * from vc.diff_databases(
+      (select db_hash from vc.commits c where c.vc_hash = from_hash),
+      (select db_hash from vc.commits c where c.vc_hash = to_hash)
+    );
+  end $$ language plpgsql;
+
+
+create function vc.diff_databases(from_hash character(32), to_hash character(32)) returns setof vc.diff as $$
+  begin
+    return query select * from vc.diff_tables(
+      (select table_hashes from vc.databases d where d.vc_hash = from_hash),
+      (select table_hashes from vc.databases d where d.vc_hash = to_hash)
+    );
+  end $$ language plpgsql;
+
+
+create function vc.diff_tables(from_tables hstore, to_tables hstore) returns setof vc.diff as $$
+  declare
+    changed_tables varchar[] := akeys(from_tables-to_tables); -- FIXME: probably wrong, eg in the case of added but not committed tables
+    table_name     varchar;
+  begin
+    foreach table_name in array changed_tables
     loop
-      frows := (select row_hashes from vc.tables where tables.vc_hash = ftables->key);
-      trows := (select row_hashes from vc.tables where tables.vc_hash = ttables->key);
-      return query with
-        lhs as (select unnest(frows) as vc_hash),
-        rhs as (select unnest(trows) as vc_hash),
-        lhs_only as (select lhs.vc_hash from lhs left  join rhs on (lhs = rhs) where rhs is null),
-        rhs_only as (select rhs.vc_hash from lhs right join rhs on (lhs = rhs) where lhs is null)
-        select 'delete'::varchar, key, lhs_only.vc_hash from lhs_only
-        union all
-        select 'insert'::varchar, key, rhs_only.vc_hash from rhs_only;
+      return query select * from vc.diff_rows(
+        table_name,
+        (select row_hashes from vc.tables where tables.vc_hash = from_tables->table_name),
+        (select row_hashes from vc.tables where tables.vc_hash = to_tables->table_name)
+      );
     end loop;
   end $$ language plpgsql;
+
+
+create function vc.diff_rows(table_name varchar, from_rows character(32)[], to_rows character(32)[])
+  returns setof vc.diff as $$
+    with
+    f      as (select unnest(from_rows) as vc_hash),
+    t      as (select unnest(to_rows)   as vc_hash),
+    f_only as (select f.vc_hash from f left  join t on (f = t) where t is null),
+    t_only as (select t.vc_hash from f right join t on (f = t) where f is null)
+    select 'delete', table_name, vc_hash from f_only
+    union all
+    select 'insert', table_name, vc_hash from t_only
+  $$ language sql;

@@ -1,14 +1,17 @@
 create schema git;
 
+
 create function git.config_user_ref(name varchar) returns void as $$
   begin
     perform set_config('git.user_ref', name, false);
     perform git.checkout((git.current_branch()).name);
   end $$ language plpgsql;
 
+
 create function git.current_user() returns varchar as $$
   select current_setting('git.user_ref')
   $$ language sql;
+
 
 create function git.current_branch() returns vc.branches as $$
   select branches.*
@@ -18,12 +21,15 @@ create function git.current_branch() returns vc.branches as $$
   union all select * from vc.branches where is_default
   $$ language sql;
 
+
 create function git.add_table(name varchar) returns void as $$
   begin perform vc.track_table(name);
   end $$ language plpgsql;
 
+
 create function git.init() returns void as $$
   begin end $$ language plpgsql; -- noop :P
+
 
 create function git.commit(message varchar) returns vc.commits as $$
   begin
@@ -34,6 +40,7 @@ create function git.commit(message varchar) returns vc.commits as $$
       now()::timestamp
     );
   end $$ language plpgsql;
+
 
 create function git.log() returns setof vc.commits as $$
   with
@@ -55,13 +62,16 @@ create function git.log() returns setof vc.commits as $$
     order by a.depth -- add DESC to get the path from the root to the node in question
   $$ language sql;
 
+
 create view git.branches as
   select branches.*, (branches.id = (git.current_branch()).id) as is_current
   from vc.branches;
 
+
 create function git.branch() returns setof git.branches as $$
   select * from git.branches order by name;
   $$ language sql;
+
 
 create function git.branch(new_branch_name varchar) returns vc.branches as $$
   begin
@@ -71,6 +81,7 @@ create function git.branch(new_branch_name varchar) returns vc.branches as $$
           using errcode = 'unique_violation';
   end $$ language plpgsql;
 
+
 create function git.checkout(branch_name varchar, out branch vc.branches) as $$
   begin
     branch := vc.switch_branch(git.current_user(), branch_name);
@@ -78,4 +89,17 @@ create function git.checkout(branch_name varchar, out branch vc.branches) as $$
   exception when syntax_error then
     raise '''%'' did not match any branches known to pgvc', branch_name
           using errcode = 'no_data_found';
+  end $$ language plpgsql;
+
+
+create function git.diff() returns setof vc.diff as $$
+  declare
+    branch       vc.branches;
+    vccommit     vc.commits;
+    current_hash character(32);
+  begin
+    branch       := git.current_branch();
+    vccommit     := (select commits from vc.commits where commits.vc_hash = branch.commit_hash);
+    current_hash := vc.save_branch(branch.schema_name);
+    return query select * from vc.diff_databases(vccommit.db_hash, current_hash);
   end $$ language plpgsql;

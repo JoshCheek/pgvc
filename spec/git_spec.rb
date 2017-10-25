@@ -67,6 +67,7 @@ RSpec.describe 'Mimic the git interface for familiarity' do
 
     # git diff # one insertion: white shoes
     # expect(git.diff).to... uhhhh...
+    git.diff # FIXME: this is nothing more than a smoke test at present
 
     # git commit -m 'Add white shoes'
     git.commit 'Add white shoes'

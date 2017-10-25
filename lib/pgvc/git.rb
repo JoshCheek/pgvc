@@ -34,6 +34,10 @@ class Pgvc::Git
     fn 'checkout', branch_name
   end
 
+  def diff(*args)
+    fn 'diff', *args
+  end
+
   def fn(name, *args)
     placeholders = args.map.with_index(1) { |_, i| "$#{i}" }.join(", ")
     fn_call      = "git.#{name}(#{placeholders})"

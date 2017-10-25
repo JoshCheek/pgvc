@@ -222,6 +222,9 @@ RSpec.describe 'Figuring out what it should do' do
   end
 
   describe 'diffing returns the set of changes between two commits', t:true do
+    # TODO: diff before first commit
+    # TODO: diff before adding any tables
+    # TODO: diff after adding table, but before committing it
     example 'an empty commit' do
       old = create_commit
       new = create_commit
@@ -241,13 +244,13 @@ RSpec.describe 'Figuring out what it should do' do
 
       # delete a, add c
       expect(client.diff_commits old.vc_hash, new.vc_hash).to eq [
-        Pgvc::Record.new(action: 'delete', table: 'products', vc_hash: product_a.vc_hash),
-        Pgvc::Record.new(action: 'insert', table: 'products', vc_hash: product_c.vc_hash),
+        Pgvc::Record.new(action: 'delete', table_name: 'products', vc_hash: product_a.vc_hash),
+        Pgvc::Record.new(action: 'insert', table_name: 'products', vc_hash: product_c.vc_hash),
       ]
       # delete c, add a
       expect(client.diff_commits new.vc_hash, old.vc_hash).to eq [
-        Pgvc::Record.new(action: 'delete', table: 'products', vc_hash: product_c.vc_hash),
-        Pgvc::Record.new(action: 'insert', table: 'products', vc_hash: product_a.vc_hash),
+        Pgvc::Record.new(action: 'delete', table_name: 'products', vc_hash: product_c.vc_hash),
+        Pgvc::Record.new(action: 'insert', table_name: 'products', vc_hash: product_a.vc_hash),
       ]
     end
 
