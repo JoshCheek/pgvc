@@ -121,9 +121,5 @@ create function git.diff(ref varchar) returns setof vc.diff as $$
     else
       other_commit := (select commits from vc.commits where commits.vc_hash = ref);
     end if;
-    raise warning 'ref:          %', ref;
-    raise warning 'current_hash: %', current_hash;
-    raise warning 'other_branch: %', other_branch;
-    raise warning 'other_commit: %', other_commit;
     return query select * from vc.diff_databases(other_commit.db_hash, current_hash);
   end $$ language plpgsql;
