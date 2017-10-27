@@ -10,7 +10,6 @@ end
 
 db.exec <<~SQL
   create function a() returns table(val1 integer, val2 varchar) as $$
-    declare r record;
     begin
       return query select 1, 'a'::varchar;
       return query select 2, 'b'::varchar;
@@ -21,4 +20,3 @@ db.exec <<~SQL
   # => [{"val1"=>"1", "val2"=>"a"},
   #     {"val1"=>"2", "val2"=>"b"},
   #     {"val1"=>"3", "val2"=>"c"}]
-

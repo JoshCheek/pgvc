@@ -84,11 +84,6 @@ associations.each_slice slice_size do |slice|
   db.exec_params "INSERT INTO ancestry (parent_id, child_id) VALUES #{values}", slice.flatten
 end
 
-# Add an index for performance
-db.exec <<-SQL
-  CREATE INDEX ancestry_child_id ON ancestry (child_id);
-SQL
-
 # How much data?
 db.exec('SELECT count(1) FROM strings;').to_a # => [{"count"=>"5000"}]
 db.exec('SELECT count(1) FROM ancestry;').to_a # => [{"count"=>"4999"}]
@@ -103,8 +98,8 @@ end
 
 # Run the query once to prime it
 time { find_ancestors_count(db, depth).to_a }
-# => {:seconds=>2.326676, :result=>[{"count"=>"5000"}]}
+# => {:seconds=>2.293476, :result=>[{"count"=>"5000"}]}
 
 # And once to see how it performs
 time { find_ancestors_count(db, depth-1).to_a }
-# => {:seconds=>2.293012, :result=>[{"count"=>"4999"}]}
+# => {:seconds=>2.260849, :result=>[{"count"=>"4999"}]}
