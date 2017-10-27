@@ -48,3 +48,9 @@ create table vc.user_branches (
   branch_id integer,
   is_system boolean -- if true, this user is the one we should use when the system
 );
+
+create type vc.diff as (
+  action     varchar, -- 'create' or 'delete'
+  table_name varchar,
+  vc_hash    character(32)
+);

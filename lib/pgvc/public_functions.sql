@@ -196,14 +196,6 @@ create function vc.get_parents(commit_hash character(32)) returns setof vc.commi
   $$ language sql;
 
 
-
-create type vc.diff as (
-  action     varchar, -- 'create' or 'delete'
-  table_name varchar,
-  vc_hash    character(32)
-);
-
-
 create function vc.diff_commits(from_hash character(32), to_hash character(32)) returns setof vc.diff as $$
   begin
     return query select * from vc.diff_databases(
