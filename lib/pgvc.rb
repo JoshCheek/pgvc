@@ -9,7 +9,7 @@ class Pgvc
   end
 
   def self.load_files(db)
-    db.exec file('tables.sql')
+    db.exec file('structure.sql')
     db.exec file('private_functions.sql')
     db.exec file('public_functions.sql')
     db.exec file('git.sql')
