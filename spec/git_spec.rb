@@ -130,14 +130,16 @@ RSpec.describe 'Mimic the git interface for familiarity' do
       git.config_user_ref 'Josh Cheek'
       git.init
       git.add_table 'products'
-      git.branch 'pristine branch'
+      git.exec "insert into products (name, colour) values ('boots', 'black')"
+      git.commit 'Add pre-existing products'
     end
 
     it 'can fast forward merge' do
       git.branch 'add-boots'
       git.checkout 'add-boots'
-      git.exec "insert into products (name, colour) values ('boots', 'black')"
-      git.commit 'Add pre-existing products'
+      git.exec "delete from products"
+      git.exec "insert into products (name, colour) values ('white', 'shoes')"
+      git.commit 'delete boots, add shoes'
       log      = git.log
       products = git.exec 'select * from products'
       git.checkout 'master'

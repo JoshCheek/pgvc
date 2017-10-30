@@ -137,7 +137,7 @@ create function git.diff(ref varchar) returns setof vc.diff as $$
 
 
 -- FIXME: Extract as much of this into the vc namespace as possible
-create function git.merge(ref varchar) returns void as $$
+create function git.merge(ref varchar) returns void as $fn$
   declare
     current_branch vc.branches;
     current_hash   character(32);
@@ -145,7 +145,8 @@ create function git.merge(ref varchar) returns void as $$
     to_merge       vc.commits;
     diff           vc.diff;
     vc_row         vc.rows;
-    table_name     varchar;
+    table_         varchar;
+    r              record;
   begin
     current_branch := git.current_branch();
     current_hash   := vc.save_branch(current_branch.schema_name);
@@ -158,21 +159,27 @@ create function git.merge(ref varchar) returns void as $$
     for diff in
       select * from git.diff(ref)
     loop
-      table_name := diff.table_name;
+      table_ := quote_ident(diff.table_name);
       vc_row := (select rows from vc.rows where rows.vc_hash = diff.vc_hash);
       if diff.action = 'insert' then
-        -- FIXME: need a test on this side, too
-        raise warning 'delete from %', table_name;
+        execute format
+          ( 'select vc_record.* from populate_record(null::%s, $1) as vc_record',
+            table_
+          )
+          using vc_row.data
+          into r;
+
+        r.vc_hash = vc_row.vc_hash;
+
+        execute format('delete from %s tbl where tbl = $1', table_, table_)
+          using r;
       else
         execute format(
-          $sql$
-            insert into %s
-            select vc_record.*
-            from populate_record(null::%s, $1) as vc_record
-          $sql$,
-          quote_ident(diff.table_name),
-          quote_ident(diff.table_name))
-          using vc_row.data;
+          $$ insert into %s
+             select vc_record.*
+             from populate_record(null::%s, $1) as vc_record
+          $$, table_, table_
+        ) using vc_row.data;
       end if;
     end loop;
 
@@ -181,4 +188,4 @@ create function git.merge(ref varchar) returns void as $$
       set commit_hash = branch.commit_hash
       where id = current_branch.id;
     /* perform vc.merge(git.current_branch(), ref); */
-  end $$ language plpgsql;
+  end $fn$ language plpgsql;
