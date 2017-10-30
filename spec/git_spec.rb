@@ -134,22 +134,24 @@ RSpec.describe 'Mimic the git interface for familiarity' do
       git.commit 'Add pre-existing products'
     end
 
-    it 'can fast forward merge' do
-      git.branch 'add-boots'
-      git.checkout 'add-boots'
-      git.exec "delete from products"
-      git.exec "insert into products (name, colour) values ('white', 'shoes')"
-      git.commit 'delete boots, add shoes'
-      log      = git.log
-      products = git.exec 'select * from products'
-      git.checkout 'master'
-      expect(git.log).to_not eq log
-      expect(git.exec 'select * from products').to_not eq products
-      git.merge 'add-boots'
-      expect(git.log).to eq log
-      expect(git.exec 'select * from products').to eq products
-    end
+    describe 'without conflicts' do
+      it 'can fast forward merge' do
+        git.branch 'add-boots'
+        git.checkout 'add-boots'
+        git.exec "delete from products"
+        git.exec "insert into products (name, colour) values ('white', 'shoes')"
+        git.commit 'delete boots, add shoes'
+        log      = git.log
+        products = git.exec 'select * from products'
+        git.checkout 'master'
+        expect(git.log).to_not eq log
+        expect(git.exec 'select * from products').to_not eq products
+        git.merge 'add-boots'
+        expect(git.log).to eq log
+        expect(git.exec 'select * from products').to eq products
+      end
 
-    it 'can do a merge when there are no conflicts'
+      it 'can do a merge when there are no conflicts'
+    end
   end
 end

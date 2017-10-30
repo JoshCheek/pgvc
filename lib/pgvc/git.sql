@@ -162,24 +162,16 @@ create function git.merge(ref varchar) returns void as $fn$
       table_ := quote_ident(diff.table_name);
       vc_row := (select rows from vc.rows where rows.vc_hash = diff.vc_hash);
       if diff.action = 'insert' then
-        execute format
-          ( 'select vc_record.* from populate_record(null::%s, $1) as vc_record',
-            table_
-          )
-          using vc_row.data
-          into r;
-
-        r.vc_hash = vc_row.vc_hash;
+        r := vc.populate_vc_record(diff.table_name, vc_row);
 
         execute format('delete from %s tbl where tbl = $1', table_, table_)
           using r;
       else
-        execute format(
-          $$ insert into %s
-             select vc_record.*
-             from populate_record(null::%s, $1) as vc_record
-          $$, table_, table_
-        ) using vc_row.data;
+        execute format
+          ( $$ insert into %s select vc_record.*
+               from populate_record(null::%s, $1) as vc_record
+            $$, table_, table_
+          ) using vc_row.data;
       end if;
     end loop;
 
@@ -189,3 +181,4 @@ create function git.merge(ref varchar) returns void as $fn$
       where id = current_branch.id;
     /* perform vc.merge(git.current_branch(), ref); */
   end $fn$ language plpgsql;
+

@@ -215,3 +215,18 @@ create function vc.diff_rows(table_name varchar, from_rows character(32)[], to_r
     union all
     select 'insert', table_name, vc_hash from t_only
   $$ language sql;
+
+
+create function vc.populate_vc_record(table_name varchar, vc_row vc.rows) returns record as $$
+  declare
+    r record;
+  begin
+    execute format
+      ( 'select vc_record.* from populate_record(null::%s, $1) as vc_record',
+        quote_ident(table_name)
+      )
+      using vc_row.data
+      into r;
+    r.vc_hash = vc_row.vc_hash;
+    return r;
+  end $$ language plpgsql;
