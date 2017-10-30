@@ -77,7 +77,7 @@ create function vc.user_create_branch(name varchar, user_ref varchar) returns vc
   end $$ language plpgsql;
 
 
-create function vc.branch_create_branch(name varchar, commit_hash character(32))
+create function vc.branch_create_branch(branch_name varchar, commit_hash character(32))
 returns vc.branches as $$
   declare
     branch vc.branches;
@@ -88,7 +88,7 @@ returns vc.branches as $$
   begin
     -- create the branch
     insert into vc.branches (commit_hash, name, schema_name, is_default)
-      values (commit_hash, name, '', false)
+      values (commit_hash, branch_name, '', false)
       returning * into branch;
 
     -- its schema_name is based on its id
@@ -104,18 +104,11 @@ returns vc.branches as $$
 
     -- for each table
     for table_name in
-      select t.name from vc.tracked_tables t
+      select name from vc.tracked_tables
     loop
       -- create the table
-      execute format(
-        'create table %s.%s (like public.%s including all);',
-        quote_ident(branch.schema_name),
-        quote_ident(table_name),
-        quote_ident(table_name)
-      );
-
-      -- add the trigger
-      perform vc.add_trigger(branch.schema_name, table_name);
+      perform vc.ensure_table_exists_in_schema(branch.schema_name, table_name);
+      perform vc.ensure_trigger_exists(branch.schema_name, table_name);
 
       -- insert the rows
       table_hash := db.table_hashes->table_name;
@@ -142,11 +135,24 @@ returns vc.branches as $$
 -- maybe useful for reducing the time it takes?
 -- SET session_replication_role = replica;
 create function vc.track_table(table_name varchar) returns void as $$
+  declare
+    /* cct float; */
   begin
+    /* cct := current_setting('checkpoint_completion_target'); */
+    /* execute format('ALTER TABLE %s SET (autovacuum_enabled = false, toast.autovacuum_enabled = false);', */
+    /*   quote_ident(table_name)); */
+    /* perform set_config('checkpoint_completion_target', '0.9', false); */
+    /* perform set_config('checkpoint_completion_target', cct, false); */
+    /* set checkpoint_completion_target to 0.9; */
     perform vc.add_hash_to_table(table_name);
-    perform vc.add_trigger('public', table_name);
+    perform vc.ensure_trigger_exists('public', table_name);
     perform vc.fire_trigger_for_rows_in(table_name);
     perform vc.record_that_were_tracking(table_name);
+    perform vc.add_table_to_existing_schemas(table_name);
+    /* execute format('ALTER TABLE %s SET (autovacuum_enabled = true, toast.autovacuum_enabled = true);', */
+    /*   quote_ident(table_name)); */
+    /* perform set_config('checkpoint_completion_target', cct); */
+    /* perform format('select set cct to %f;', cct); */
   end $$ language plpgsql;
 
 

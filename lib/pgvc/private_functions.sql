@@ -46,21 +46,6 @@ create function vc.hash_and_record_row() returns trigger as $$
   end $$ language plpgsql;
 
 
-create function vc.add_trigger(schema_name varchar, table_name varchar) returns void as $$
-  begin
-    execute format(
-      $sql$
-        create trigger vc_hash_and_record_%s_%s
-        before insert or update on %s.%s
-        for each row execute procedure vc.hash_and_record_row();
-      $sql$,
-      quote_ident(schema_name),
-      quote_ident(table_name),
-      quote_ident(schema_name),
-      quote_ident(table_name)
-    );
-  end $$ language plpgsql;
-
 
 create function vc.save_branch(schema_name varchar) returns character(32) as $$
   declare
@@ -111,3 +96,45 @@ create function vc.get_database(commit_hash character(32)) returns vc.databases 
     db  := (select databases from vc.databases where vc_hash = cmt.db_hash);
     return db;
   end $$ language plpgsql;
+
+
+create function vc.add_table_to_existing_schemas(table_name varchar) returns void as $$
+  declare
+    branch vc.branches;
+  begin
+    for branch in
+      select * from vc.branches
+    loop
+      perform vc.ensure_table_exists_in_schema(branch.schema_name, table_name);
+      perform vc.ensure_trigger_exists(branch.schema_name, table_name);
+    end loop;
+  end $$ language plpgsql;
+
+
+create function vc.ensure_table_exists_in_schema(schema_name varchar, table_name varchar) returns void as $$
+  begin
+    execute format(
+      'create table if not exists %s.%s (like public.%s including all);',
+      quote_ident(schema_name),
+      quote_ident(table_name),
+      quote_ident(table_name)
+    );
+  end $$ language plpgsql;
+
+
+create function vc.ensure_trigger_exists(schema_name varchar, table_name varchar) returns void as $fn$
+  declare
+    schema_ varchar := quote_ident(schema_name);
+    table_  varchar := quote_ident(table_name);
+  begin
+    execute format(
+      $$ drop trigger if exists vc_hash_and_record_%s_%s on %s.%s restrict;
+      $$, schema_, table_, schema_, table_
+    );
+    execute format(
+      $$ create trigger vc_hash_and_record_%s_%s
+         before insert or update on %s.%s
+         for each row execute procedure vc.hash_and_record_row();
+      $$, schema_, table_, schema_, table_
+    );
+  end $fn$ language plpgsql;

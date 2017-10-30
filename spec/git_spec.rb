@@ -22,8 +22,12 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     # git init
     git.init
 
+    # git branch
+    git.branch 'pristine branch'
+
     # git add products
     git.add_table 'products'
+    boots = git.exec('select * from products').first
 
     # git commit -m 'Add pre-existing products'
     commit1 = git.commit 'Add pre-existing products'
@@ -33,45 +37,52 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
     expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'system']
 
-    # git branch # 1 branch, master, which we are on
-    expect(git.branch.map(&:name)).to eq ['master']
-    expect(git.branch.map(&:current?)).to eq [true]
+    # git branch # 2 branches, *master, and "pristine shoes"
+    expect(git.branch.map(&:name)).to eq ['master', 'pristine branch']
+    expect(git.branch.map(&:current?)).to eq [true, false]
 
     # git branch 'add-shoes'
     git.branch 'add-shoes'
 
-    # git branch # 2 branches, master and add-shoes, we are on master
-    expect(git.branch.map(&:name)).to eq ['add-shoes', 'master']
-    expect(git.branch.map(&:current?)).to eq [false, true]
+    # git branch # 3 branches, "pristine branch", *master, and add-shoes
+    expect(git.branch.map(&:name)).to eq ['add-shoes', 'master', 'pristine branch']
+    expect(git.branch.map(&:current?)).to eq [false, true, false]
 
     # git checkout 'add-shoes'
     git.checkout 'add-shoes'
 
     # git branch # 2 branches, master and add-shoes, we are on add-shoes
-    expect(git.branch.map(&:name)).to eq ['add-shoes', 'master']
-    expect(git.branch.map(&:current?)).to eq [true, false]
+    expect(git.branch.map(&:name)).to eq ['add-shoes', 'master', 'pristine branch']
+    expect(git.branch.map(&:current?)).to eq [true, false, false]
 
     # git log # one commit: 'Add pre-existing products'
     expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
     expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'system']
 
     # git diff # no changes
-    # expect(git.diff).to... uhhhh...
+    expect(git.diff).to eq []
 
     # insert_products shoes: 'white'
-    git.exec "insert into products (name, colour) values ('shoes', 'white')"
+    shoes = git.exec("insert into products (name, colour) values ('shoes', 'white') returning *").first
 
     # git log # one commit: 'Add pre-existing products'
     expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
     expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'system']
 
     # git diff # one insertion: white shoes
-    # expect(git.diff).to... uhhhh...
-    git.diff # FIXME: this is nothing more than a smoke test at present
+    diff1 = git.diff
+    expect(diff1.map(&:action)).to eq ['insert']
+    expect(diff1.map(&:table_name)).to eq ['products']
+    expect(diff1.map(&:vc_hash)).to eq [shoes.vc_hash]
 
     # git commit -m 'Add white shoes'
     commit2 = git.commit 'Add white shoes'
-    git.diff commit1.vc_hash # FIXME: just another smoke test
+
+    # git diff # no uncommitted changes
+    expect(git.diff).to eq []
+
+    # git diff HEAD^ # one insertion: white shoes
+    expect(git.diff commit1.vc_hash).to eq diff1
 
     # git log # two commits: 'Add white shoes', 'Add pre-existing products'
     expect(git.log.map(&:summary)).to eq ['Add white shoes', 'Add pre-existing products', 'Initial commit']
@@ -88,6 +99,17 @@ RSpec.describe 'Mimic the git interface for familiarity' do
 
     # git log # one commit: 'Add pre-existing products'
     expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
+
+    # git checkout HEAD^
+    git.checkout 'pristine branch'
+    expect(git.log.map &:summary).to eq ['Initial commit']
+
+    # git diff add-shoes # inverse of previous diff
+    diff2 = git.diff 'add-shoes'
+    expect(diff2.map &:to_h).to eq [
+      {action: 'delete', table_name: 'products', vc_hash: shoes.vc_hash},
+      {action: 'delete', table_name: 'products', vc_hash: boots.vc_hash},
+    ]
   end
 
 
