@@ -22,6 +22,17 @@ create function git.current_branch() returns vc.branches as $$
   $$ language sql;
 
 
+create function git.current_commit() returns vc.commits as $$
+  declare branch vc.branches;
+  begin
+    branch := git.current_branch();
+    return (
+      select commits from vc.commits
+      where commits.vc_hash = branch.commit_hash
+    );
+  end $$ language plpgsql;
+
+
 create function git.add_table(name varchar) returns void as $$
   begin perform vc.track_table(name);
   end $$ language plpgsql;
@@ -99,7 +110,7 @@ create function git.diff() returns setof vc.diff as $$
     current_hash character(32);
   begin
     branch       := git.current_branch();
-    vccommit     := (select commits from vc.commits where commits.vc_hash = branch.commit_hash);
+    vccommit     := git.current_commit();
     current_hash := vc.save_branch(branch.schema_name);
     return query select * from vc.diff_databases(vccommit.db_hash, current_hash);
   end $$ language plpgsql;
@@ -122,4 +133,52 @@ create function git.diff(ref varchar) returns setof vc.diff as $$
       other_commit := (select commits from vc.commits where commits.vc_hash = ref);
     end if;
     return query select * from vc.diff_databases(other_commit.db_hash, current_hash);
+  end $$ language plpgsql;
+
+
+-- FIXME: Extract as much of this into the vc namespace as possible
+create function git.merge(ref varchar) returns void as $$
+  declare
+    current_branch vc.branches;
+    current_hash   character(32);
+    branch         vc.branches;
+    to_merge       vc.commits;
+    diff           vc.diff;
+    vc_row         vc.rows;
+    table_name     varchar;
+  begin
+    current_branch := git.current_branch();
+    current_hash   := vc.save_branch(current_branch.schema_name);
+    branch         := (select branches from vc.branches where name = ref);
+    to_merge       := (select commits  from vc.commits  where vc_hash = branch.commit_hash);
+
+    -- NOTE: THIS IS A FAST FORWARD MERGE ONLY, RIGHT NOW!!
+
+    -- TODO: more optimal ot join here rather than execute a subquery for each row
+    for diff in
+      select * from git.diff(ref)
+    loop
+      table_name := diff.table_name;
+      vc_row := (select rows from vc.rows where rows.vc_hash = diff.vc_hash);
+      if diff.action = 'insert' then
+        -- FIXME: need a test on this side, too
+        raise warning 'delete from %', table_name;
+      else
+        execute format(
+          $sql$
+            insert into %s
+            select vc_record.*
+            from populate_record(null::%s, $1) as vc_record
+          $sql$,
+          quote_ident(diff.table_name),
+          quote_ident(diff.table_name))
+          using vc_row.data;
+      end if;
+    end loop;
+
+    current_branch.commit_hash = branch.commit_hash;
+    update vc.branches
+      set commit_hash = branch.commit_hash
+      where id = current_branch.id;
+    /* perform vc.merge(git.current_branch(), ref); */
   end $$ language plpgsql;

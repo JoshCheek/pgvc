@@ -123,4 +123,31 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     # checkout
     expect { git.checkout('dne') }.to raise_error PG::NoDataFound, /'dne' did not match any branches known to pgvc/
   end
+
+
+  describe 'merging', t:true do
+    before do
+      git.config_user_ref 'Josh Cheek'
+      git.init
+      git.add_table 'products'
+      git.branch 'pristine branch'
+    end
+
+    it 'can fast forward merge' do
+      git.branch 'add-boots'
+      git.checkout 'add-boots'
+      git.exec "insert into products (name, colour) values ('boots', 'black')"
+      git.commit 'Add pre-existing products'
+      log      = git.log
+      products = git.exec 'select * from products'
+      git.checkout 'master'
+      expect(git.log).to_not eq log
+      expect(git.exec 'select * from products').to_not eq products
+      git.merge 'add-boots'
+      expect(git.log).to eq log
+      expect(git.exec 'select * from products').to eq products
+    end
+
+    it 'can do a merge when there are no conflicts'
+  end
 end

@@ -221,7 +221,7 @@ RSpec.describe 'Figuring out what it should do' do
     end
   end
 
-  describe 'diffing returns the set of changes between two commits', t:true do
+  describe 'diffing returns the set of changes between two commits' do
     # TODO: diff before first commit
     # TODO: diff before adding any tables
     # TODO: diff after adding table, but before committing it
@@ -259,5 +259,11 @@ RSpec.describe 'Figuring out what it should do' do
     example 'inserting and updating is just inserting'
     example 'updating and updating is just updating (for whichever came last)'
     example 'updating and deleting is just a deletinv'
+  end
+
+
+  describe 'merging' do
+    it 'can apply a patch that has no conflicts'
+    it 'can identify a conflict based on the primary key'
   end
 end

@@ -38,6 +38,10 @@ class Pgvc::Git
     fn 'diff', *args
   end
 
+  def merge(*args)
+    fn 'merge', *args
+  end
+
   def fn(name, *args)
     placeholders = args.map.with_index(1) { |_, i| "$#{i}" }.join(", ")
     fn_call      = "git.#{name}(#{placeholders})"
