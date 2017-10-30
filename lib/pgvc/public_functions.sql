@@ -77,82 +77,50 @@ create function vc.user_create_branch(name varchar, user_ref varchar) returns vc
   end $$ language plpgsql;
 
 
-create function vc.branch_create_branch(branch_name varchar, commit_hash character(32))
-returns vc.branches as $$
+create function vc.branch_create_branch(
+  in  branch_name varchar,
+  in  commit_hash character(32),
+  out branch      vc.branches
+) as $$
   declare
-    branch vc.branches;
-    db     vc.databases;
+    db         vc.databases;
     table_name varchar;
     table_hash varchar;
-    row_hashes character(32)[];
   begin
-    -- create the branch
-    insert into vc.branches (commit_hash, name, schema_name, is_default)
-      values (commit_hash, branch_name, '', false)
-      returning * into branch;
+    branch := vc.insert_branch(branch_name, commit_hash);
+    db     := vc.get_database(commit_hash);
+    perform vc.create_schema(branch.schema_name);
 
-    -- its schema_name is based on its id
-    update vc.branches set schema_name = 'branch_'||branch.id
-      where id = branch.id
-      returning * into branch;
-
-    -- get the database
-    db := vc.get_database(commit_hash);
-
-    -- create the schema
-    execute format('create schema %s', quote_ident(branch.schema_name));
-
-    -- for each table
     for table_name in
       select name from vc.tracked_tables
     loop
-      -- create the table
+      table_hash := db.table_hashes->table_name;
       perform vc.ensure_table_exists_in_schema(branch.schema_name, table_name);
       perform vc.ensure_trigger_exists(branch.schema_name, table_name);
-
-      -- insert the rows
-      table_hash := db.table_hashes->table_name;
-      row_hashes := (select tables.row_hashes from vc.tables where vc_hash = table_hash);
-      execute format(
-        $sql$
-          insert into %s.%s
-          select vc_record.*
-          from unnest($1) as row_hash
-          join vc.rows on vc_hash = row_hash
-          join populate_record(null::%s.%s, data) as vc_record on true
-        $sql$,
-        quote_ident(branch.schema_name),
-        quote_ident(table_name),
-        quote_ident(branch.schema_name),
-        quote_ident(table_name)
-      ) using row_hashes;
+      perform vc.insert_rows(
+        branch.schema_name,
+        table_name,
+        (select row_hashes from vc.tables where vc_hash = table_hash)
+      );
     end loop;
-    return branch;
   end $$ language plpgsql;
 
 
 
--- maybe useful for reducing the time it takes?
--- SET session_replication_role = replica;
+-- Maybe useful for reducing the time it takes?
+--   SET session_replication_role = replica;
+-- Okay, thenthereisalso turning off autovacuum:
+--   execute format('ALTER TABLE %s SET (autovacuum_enabled = false, toast.autovacuum_enabled = false);',
+--   quote_ident(table_name));
+-- And something about savepoints or checkpoints or smth
+--   set checkpoint_completion_target to 0.9;
 create function vc.track_table(table_name varchar) returns void as $$
-  declare
-    /* cct float; */
   begin
-    /* cct := current_setting('checkpoint_completion_target'); */
-    /* execute format('ALTER TABLE %s SET (autovacuum_enabled = false, toast.autovacuum_enabled = false);', */
-    /*   quote_ident(table_name)); */
-    /* perform set_config('checkpoint_completion_target', '0.9', false); */
-    /* perform set_config('checkpoint_completion_target', cct, false); */
-    /* set checkpoint_completion_target to 0.9; */
     perform vc.add_hash_to_table(table_name);
     perform vc.ensure_trigger_exists('public', table_name);
     perform vc.fire_trigger_for_rows_in(table_name);
     perform vc.record_that_were_tracking(table_name);
     perform vc.add_table_to_existing_schemas(table_name);
-    /* execute format('ALTER TABLE %s SET (autovacuum_enabled = true, toast.autovacuum_enabled = true);', */
-    /*   quote_ident(table_name)); */
-    /* perform set_config('checkpoint_completion_target', cct); */
-    /* perform format('select set cct to %f;', cct); */
   end $$ language plpgsql;
 
 

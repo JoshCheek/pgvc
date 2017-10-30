@@ -138,3 +138,48 @@ create function vc.ensure_trigger_exists(schema_name varchar, table_name varchar
       $$, schema_, table_, schema_, table_
     );
   end $fn$ language plpgsql;
+
+
+create function vc.insert_branch(branch_name varchar, commit_hash character(32)) returns vc.branches as $$
+  declare
+    branch vc.branches;
+  begin
+    -- first create it, this way we get the id
+    insert into vc.branches (commit_hash, name, schema_name, is_default)
+      values (commit_hash, branch_name, '', false)
+      returning * into branch;
+
+    -- then update its schema_name based on its id
+    update vc.branches set schema_name = 'branch_'||branch.id
+      where id = branch.id
+      returning * into branch;
+
+    return branch;
+  end $$ language plpgsql;
+
+
+create function vc.create_schema(schema_name varchar) returns void as $$
+  begin execute format('create schema %s;', quote_ident(schema_name));
+  end $$ language plpgsql;
+
+
+create function vc.insert_rows
+  ( schema_name varchar,
+    table_name  varchar,
+    row_hashes  character(32)[]
+  ) returns void as $$
+  begin
+    execute format(
+      $sql$
+        insert into %s.%s
+        select vc_record.*
+        from unnest($1) as row_hash
+        join vc.rows on vc_hash = row_hash
+        join populate_record(null::%s.%s, data) as vc_record on true
+      $sql$,
+      quote_ident(schema_name),
+      quote_ident(table_name),
+      quote_ident(schema_name),
+      quote_ident(table_name)
+    ) using row_hashes;
+  end $$ language plpgsql;
