@@ -1,4 +1,4 @@
-create function vc.calculate_commit_hash(c vc.commits) returns varchar(32) as $$
+create function vc.calculate_commit_hash(c vc.commits) returns character(32) as $$
   select md5(concat(
     c.db_hash,
     c.user_ref,
@@ -177,9 +177,7 @@ create function vc.insert_rows
         join vc.rows on vc_hash = row_hash
         join populate_record(null::%s.%s, data) as vc_record on true
       $sql$,
-      quote_ident(schema_name),
-      quote_ident(table_name),
-      quote_ident(schema_name),
-      quote_ident(table_name)
+      quote_ident(schema_name), quote_ident(table_name),
+      quote_ident(schema_name), quote_ident(table_name)
     ) using row_hashes;
   end $$ language plpgsql;
