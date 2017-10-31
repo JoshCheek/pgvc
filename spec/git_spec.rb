@@ -7,7 +7,7 @@ RSpec.describe 'Mimic the git interface for familiarity' do
   attr_reader :client
 
   before do
-    @client = Pgvc.init db, system_user_ref: 'system', default_branch: 'master'
+    @client = Pgvc.init db, default_branch: 'master'
   end
 
   let(:git) { Pgvc::Git.new db }

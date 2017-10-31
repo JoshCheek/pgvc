@@ -1,18 +1,9 @@
-create function vc.init(system_user_ref varchar, default_branchname varchar)
+create function vc.init(default_branchname varchar)
 returns void as $$
-  declare
-    default_branch vc.branches;
-  begin
-    -- Create the first branch
+    -- Create the first branch, no commit to point to yet
     insert into vc.branches (commit_hash, name, schema_name, is_default)
-      values (null, default_branchname, 'public', true)
-      returning *
-      into default_branch;
-
-    -- Save the system user id to that branch
-    insert into vc.user_branches (user_ref, branch_id, is_system)
-      values (system_user_ref, default_branch.id, true);
-  end $$ language plpgsql;
+      values (null, default_branchname, 'public', true);
+  $$ language sql;
 
 
 

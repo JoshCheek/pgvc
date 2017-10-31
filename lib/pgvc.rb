@@ -15,9 +15,9 @@ class Pgvc
     db.exec file('git.sql')
   end
 
-  def self.init(db, system_user_ref:, default_branch:)
+  def self.init(db, default_branch:)
     load_files db
-    new(db).tap { |pgvc| pgvc.fn 'init', system_user_ref.to_s, default_branch }
+    new(db).tap { |pgvc| pgvc.fn 'init', default_branch }
   end
 end
 

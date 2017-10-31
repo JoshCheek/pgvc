@@ -41,16 +41,16 @@ module SpecHelper::Acceptance
     klass.before do
       ROOT_DB.exec 'select reset_test_db()'
       @db = PG.connect dbname: DBNAME
-      @system_user, @user = sql <<~SQL
+      @user, * = sql <<~SQL
         SET client_min_messages=WARNING;
         create table users    (id serial primary key, name varchar);
         create table products (id serial primary key, name varchar, colour varchar);
-        insert into users (name) values ('system'), ('josh') returning *;
+        insert into users (name) values ('josh') returning *;
       SQL
     end
   end
 
-  attr_reader :db, :user, :system_user
+  attr_reader :db, :user
 
   def sql1(sql, *params, **options)
     sql(sql, *params, **options).first

@@ -7,7 +7,7 @@ RSpec.describe 'Figuring out what it should do' do
 
   before do
     before_init
-    @client = Pgvc.init db, system_user_ref: system_user.id, default_branch: 'trunk'
+    @client = Pgvc.init db, default_branch: 'trunk'
     @client.track_table 'products'
   end
 

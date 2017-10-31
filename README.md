@@ -54,6 +54,5 @@ Ways to contribute
 * Would it make more sense to make a schema per user rather than a schema per branch?
 * Would be nice to have tags, which are like branches, except they don't get a schema,
   ie a way to name a commit
-* Shall we delete the system user and the "initial commit"?
 * What about makng the insertion of records into vc.rows happen on commit instead of at the time of insert?
   Or allowing them to be deferred?
