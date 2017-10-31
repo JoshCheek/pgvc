@@ -20,7 +20,7 @@ db.exec <<~SQL
     values ('abc', 'a=>b,c=>d'::hstore),
            ('def', 'a=>b,c=>e'::hstore);
 
-  create function whatever() returns void as $$
+  do $$
     declare
       h1 hstore := (select table_hashes from databases where vc_hash = 'abc');
       h2 hstore := (select table_hashes from databases where vc_hash = 'def');
@@ -35,8 +35,6 @@ db.exec <<~SQL
         raise warning 'h2 val:         %', h2->key;
       end loop;
     end $$ language plpgsql;
-
-  select whatever();
   SQL
 
 # !> WARNING:  Mismatched key: c

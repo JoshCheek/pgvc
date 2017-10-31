@@ -9,20 +9,20 @@ def db.exec(*)
 end
 
 db.exec <<~SQL
-  create function deref(integer) returns varchar as $$
-    select $1::text||'int'
+  create function fn(integer) returns varchar as $$
+    select $1::text||':integer'
   $$ language sql;
 
-  create function deref(varchar) returns varchar as $$
-    select $1||'varchar'
+  create function fn(varchar) returns varchar as $$
+    select $1||':varchar'
   $$ language sql;
 
-  create function deref(text) returns varchar as $$
-    select $1::varchar||'text'
+  create function fn(text) returns varchar as $$
+    select $1::varchar||':text'
   $$ language sql;
 
-  select deref(1) as a,
-         deref('1') as b,
-         deref('1'::varchar) as c;
+  select fn(1)            as one,
+         fn('2')          as two,
+         fn('3'::varchar) as three;
   SQL
-  # => [{"a"=>"1int", "b"=>"1text", "c"=>"1varchar"}]
+  # => [{"one"=>"1:integer", "two"=>"2:text", "three"=>"3:varchar"}]

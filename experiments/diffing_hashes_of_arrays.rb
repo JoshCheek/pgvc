@@ -17,13 +17,14 @@ db.exec <<~SQL
   );
   insert into tables (vc_hash, table_hashes)
     values ('abc', '"comments"=>"{first}", "users"=>"{erin}",       "products"=>"{boots,cleats}"'),
-           ('def', '"comments"=>"{first}", "users"=>"{erin,clark}", "products"=>"{shoes,cleats}"');
+           ('def', '"comments"=>"{first}", "users"=>"{erin,clark}", "products"=>"{cleats,shoes}"');
 
 
-  create function whatever() returns table(table_name text, action text, val text) as $$
+  create function diff(left_hash text, right_hash text)
+    returns table(table_name text, action text, val text) as $$
     declare
-      hl hstore := (select table_hashes from tables where vc_hash = 'abc');
-      hr hstore := (select table_hashes from tables where vc_hash = 'def');
+      hl hstore := (select table_hashes from tables where vc_hash = left_hash);
+      hr hstore := (select table_hashes from tables where vc_hash = right_hash);
       mismatched_keys text[] := akeys(hl-hr);
       key text;
     begin
@@ -41,7 +42,7 @@ db.exec <<~SQL
       end loop;
     end $$ language plpgsql;
 
-  select * from whatever();
+  select * from diff('abc', 'def');
   SQL
   # => [{"table_name"=>"users", "action"=>"insert", "val"=>"clark"},
   #     {"table_name"=>"products", "action"=>"delete", "val"=>"boots"},

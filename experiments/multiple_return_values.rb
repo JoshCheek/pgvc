@@ -28,7 +28,7 @@ db.exec <<~SQL
     end $$ language plpgsql;
 
 
-  -- Sheesh, I figured this must exist, but it took forever to figure itout!
+  -- Sheesh, I figured this must exist, but it took forever to figure it out!
   create or replace function using_select_into() returns varchar as $$
     declare
       d varchar;
@@ -42,5 +42,3 @@ db.exec <<~SQL
   select using_record(), using_select_into();
   SQL
   # => [{"using_record"=>"bee see", "using_select_into"=>"bee see"}]
-
-
