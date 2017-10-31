@@ -1,3 +1,8 @@
+RSpec.configure do |config|
+  config.color     = true
+  config.formatter = 'documentation'
+end
+
 DBNAME = 'pgvc_testing'.freeze
 begin
   ROOT_DB = PG.connect dbname: DBNAME
