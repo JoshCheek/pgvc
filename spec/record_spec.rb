@@ -27,11 +27,13 @@ RSpec.describe 'Record' do
     end
   end
 
-  it 'is equal to another record with the same keys and values' do
-    expect(record('a' => 'b')).to eq record('a' => 'b')
-    expect(record('a' => 'b')).to_not eq record('a' => 'c')
-    expect(record('a' => 'b')).to_not eq record('c' => 'b')
-    expect(record('a' => 'b')).to_not eq record('a' => 'b', 'c' => 'd')
+  describe '==' do
+    it 'is equal to another record with the same keys and values' do
+      expect(record('a' => 'b')).to eq record('a' => 'b')
+      expect(record('a' => 'b')).to_not eq record('a' => 'c')
+      expect(record('a' => 'b')).to_not eq record('c' => 'b')
+      expect(record('a' => 'b')).to_not eq record('a' => 'b', 'c' => 'd')
+    end
   end
 
   describe 'booleans' do
@@ -57,21 +59,35 @@ RSpec.describe 'Record' do
     end
   end
 
-  it 'inspects similarly to a struct' do
-    expect(record('a' => 'b', 'is_a' => 't').inspect)
-      .to eq '#<Record a="b" is_a=true>'
+  describe 'inspection' do
+    it 'inspects similarly to a struct' do
+      expect(record('a' => 'b', 'is_a' => 't').inspect)
+        .to eq '#<Record a="b" is_a=true>'
+    end
+
+    it 'pretty inspects similarly to a hash' do
+      r = record(vc_hash:  "0d398289f4d7530385520236f434ad1a",
+                 db_hash:  "58bf94a8ca3f0c7761d3ca150e1b8622",
+                 user_ref: "Josh Cheek",
+                 summary:  "Add white shoes")
+      expect(PP.pp(r, '')).to eq <<~RUBY
+        #<Record vc_hash="0d398289f4d7530385520236f434ad1a"
+                 db_hash="58bf94a8ca3f0c7761d3ca150e1b8622"
+                 user_ref="Josh Cheek"
+                 summary="Add white shoes">
+      RUBY
+    end
   end
 
-  it 'pretty inspects similarly to a hash' do
-    r = record(vc_hash:  "0d398289f4d7530385520236f434ad1a",
-               db_hash:  "58bf94a8ca3f0c7761d3ca150e1b8622",
-               user_ref: "Josh Cheek",
-               summary:  "Add white shoes")
-    expect(PP.pp(r, '')).to eq <<~RUBY
-      #<Record vc_hash="0d398289f4d7530385520236f434ad1a"
-               db_hash="58bf94a8ca3f0c7761d3ca150e1b8622"
-               user_ref="Josh Cheek"
-               summary="Add white shoes">
-    RUBY
+  describe 'conversion' do
+    specify '#to_h returns a dup\'d hash of the attributes with symbol keys and converted values' do
+      record = record 'a' => 'b', 'is_a' => 't'
+      expect(record.to_h).to eq a: 'b', is_a: true
+    end
+
+    specify '#to_a returns an array of the converted attribute values' do
+      record = record 'a' => 'b', 'is_a' => 't'
+      expect(record.to_a).to eq ['b', true]
+    end
   end
 end
