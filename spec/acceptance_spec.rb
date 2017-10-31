@@ -31,7 +31,7 @@ RSpec.describe 'Figuring out what it should do' do
       sql "insert into products (name, colour) values ('boots', 'black')"
     end
 
-    it 'starts on the default branch pointing at the root commit, using the public schema, and tracks the tables' do
+    it 'starts on the default branch without a commit, using the public schema, and tracks the tables' do
       # -- branch / commit --
       # user is on a branch (the default branch)
       branch = client.user_get_branch user.id
@@ -40,9 +40,9 @@ RSpec.describe 'Figuring out what it should do' do
       # the default branch corresponds to the public schema
       expect(branch.schema_name).to eq 'public'
 
-      # it is pointing at the initial commit
+      # it has no commit
       commit = client.get_commit branch.commit_hash
-      expect(commit.summary).to match /initial commit/i
+      expect(commit.vc_hash).to eq nil # FIXME: why doesn't commit itself come back as null? Maybe b/c of how we query?
 
       # -- tracked tables --
       # added vc_rows and calculated it for existing records
@@ -162,18 +162,16 @@ RSpec.describe 'Figuring out what it should do' do
     end
 
     it 'makes the old commit a parent of the new commit and updates the branch' do
-      branch = client.user_get_branch(user.id)
-      prev   = client.get_commit branch.commit_hash
-
-      commit = create_commit
-
-      branch = client.user_get_branch(user.id)
-      crnt   = client.get_commit branch.commit_hash
-
-      expect(crnt).to eq commit
+      prev = create_commit summary: 'Initial commit'
+      crnt = create_commit
       expect(client.get_parents crnt.vc_hash).to eq [prev]
+
+      branch = client.user_get_branch(user.id)
+      commit = client.get_commit branch.commit_hash
+      expect(crnt).to eq commit
     end
   end
+
 
   describe 'history' do
     # should probably be able to set a branch at an arbitrary commit, but I'll deal w/ it later

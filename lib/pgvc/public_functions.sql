@@ -1,21 +1,11 @@
 create function vc.init(system_user_ref varchar, default_branchname varchar)
 returns void as $$
   declare
-    root_commit    vc.commits;
     default_branch vc.branches;
   begin
-    -- Create the initial commit
-    root_commit.user_ref    := system_user_ref;
-    root_commit.summary     := 'Initial commit';
-    root_commit.description := '';
-    root_commit.created_at  := now();
-    root_commit.db_hash     := vc.save_branch('public'); -- FIXME: Nothing tests this
-    root_commit.vc_hash     := vc.calculate_commit_hash(root_commit);
-    insert into vc.commits select root_commit.*;
-
     -- Create the first branch
     insert into vc.branches (commit_hash, name, schema_name, is_default)
-      values (root_commit.vc_hash, default_branchname, 'public', true)
+      values (null, default_branchname, 'public', true)
       returning *
       into default_branch;
 
@@ -190,9 +180,15 @@ create function vc.diff_databases(from_hash character(32), to_hash character(32)
 
 create function vc.diff_tables(from_tables hstore, to_tables hstore) returns setof vc.diff as $$
   declare
-    changed_tables varchar[] := akeys((from_tables-to_tables)||(to_tables-from_tables)); -- FIXME: no tests on the bidirectionality of this
+    changed_tables varchar[];
     table_name     varchar;
   begin
+    changed_tables := akeys(coalesce(
+      (from_tables-to_tables)||(to_tables-from_tables), -- FIXME: no tests on the bidirectionality of this
+      to_tables,
+      from_tables -- FIXME: not tested (haven't even tried running it yet it)
+    ));
+
     foreach table_name in array changed_tables
     loop
       return query select * from vc.diff_rows(

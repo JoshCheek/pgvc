@@ -19,6 +19,9 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     # git config --global user.name 'Josh Cheek'
     git.config_user_ref 'Josh Cheek'
 
+    # FIXME: smoke test
+    git.diff
+
     # git init
     git.init
 
@@ -34,8 +37,8 @@ RSpec.describe 'Mimic the git interface for familiarity' do
 
     # git log # one commit: 'Add pre-existing products'
     messages = git.log
-    expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
-    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'system']
+    expect(git.log.map(&:summary)).to eq ['Add pre-existing products']
+    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek']
 
     # git branch # 2 branches, *master, and "pristine shoes"
     expect(git.branch.map(&:name)).to eq ['master', 'pristine branch']
@@ -56,8 +59,8 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     expect(git.branch.map(&:current?)).to eq [true, false, false]
 
     # git log # one commit: 'Add pre-existing products'
-    expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
-    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'system']
+    expect(git.log.map(&:summary)).to eq ['Add pre-existing products']
+    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek']
 
     # git diff # no changes
     expect(git.diff).to eq []
@@ -66,8 +69,8 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     shoes = git.exec("insert into products (name, colour) values ('shoes', 'white') returning *").first
 
     # git log # one commit: 'Add pre-existing products'
-    expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
-    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'system']
+    expect(git.log.map(&:summary)).to eq ['Add pre-existing products']
+    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek']
 
     # git diff # one insertion: white shoes
     diff1 = git.diff
@@ -85,8 +88,8 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     expect(git.diff commit1.vc_hash).to eq diff1
 
     # git log # two commits: 'Add white shoes', 'Add pre-existing products'
-    expect(git.log.map(&:summary)).to eq ['Add white shoes', 'Add pre-existing products', 'Initial commit']
-    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'Josh Cheek', 'system']
+    expect(git.log.map(&:summary)).to eq ['Add white shoes', 'Add pre-existing products']
+    expect(git.log.map(&:user_ref)).to eq ['Josh Cheek', 'Josh Cheek']
 
     # git checkout master
     products = git.exec('select * from products order by id')
@@ -98,11 +101,11 @@ RSpec.describe 'Mimic the git interface for familiarity' do
     expect(products.map(&:colour)).to eq %w[black]
 
     # git log # one commit: 'Add pre-existing products'
-    expect(git.log.map(&:summary)).to eq ['Add pre-existing products', 'Initial commit']
+    expect(git.log.map(&:summary)).to eq ['Add pre-existing products']
 
     # git checkout HEAD^
     git.checkout 'pristine branch'
-    expect(git.log.map &:summary).to eq ['Initial commit']
+    expect(git.log.map &:summary).to eq []
 
     # git diff add-shoes # inverse of previous diff
     diff2 = git.diff 'add-shoes'
