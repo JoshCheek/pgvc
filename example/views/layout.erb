@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pgvc demo</title>
+  </head>
+  <body>
+    <div>
+      <% if @username %>
+        <div>You are logged in as <%= @username %></div>
+        <form action="/session" method="delete">
+          <input type="submit" name="Logout" />
+        </form>
+      <% else %>
+        <form action="/session" method="post">
+          <label for="username">Username</label>
+          <input id="username" type="text" name="username" />
+          <input type="submit" name="Login" />
+        </form>
+      <% end %>
+    </div>
+    <%= yield %>
+  </body>
+</html>
+

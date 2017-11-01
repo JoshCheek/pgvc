@@ -20,21 +20,40 @@ RSpec.describe App do
 
   let(:session) { Capybara.current_session }
 
+  def visit(*args)
+    session.visit(*args)
+    expect(session.status_code).to eq 200
+  end
+
   describe '/reset' do
     it 'resets the database with the default branch being named "publish"' do
-      session.visit '/reset'
-      expect(session.status_code).to eq 200
+      visit '/reset'
       Product.create! name: 'lolol'
       expect(Product.find_by name: 'lolol').to_not eq nil
-      session.visit '/reset'
-      expect(session.status_code).to eq 200
+      visit '/reset'
       expect(Product.find_by name: 'lolol').to eq nil
     end
   end
 
   describe '/' do
-    it 'lists the products on the publish branch'
-    it 'has a login form'
+    it 'lists the products on the publish branch' do
+      Product.create! name: 'p1', colour: 'c1'
+      Product.create! name: 'p2', colour: 'c2'
+      visit '/'
+      expect(session.body.scan /\b[pc]\d+\b/).to eq %w[p1 c1 p2 c2]
+    end
+
+    it 'has a login form or a logout button' do
+      visit '/'
+      expect(session.body).to_not include 'Josh'
+      session.fill_in 'Username', with: 'Josh'
+      session.find('input[name="Login"]').click
+      expect(session.current_path).to eq '/'
+      expect(session.body).to include 'Josh'
+      expect(session.body).to_not include 'Login'
+      session.find('input[name="Logout"]').click
+      expect(session.body).to_not include 'Josh'
+    end
   end
 
   describe '/products' do
@@ -49,11 +68,6 @@ RSpec.describe App do
     describe 'PUT' do
       it 'updates an existing product on the user\'s branch'
     end
-  end
-
-  describe '/session' do
-    specify 'POST logs in'
-    specify 'DELETE logs out'
   end
 
   describe '/branches' do

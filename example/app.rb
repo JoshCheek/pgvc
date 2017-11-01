@@ -40,6 +40,12 @@ require 'pgvc'
 
 
 class App < Sinatra::Base
+  enable :sessions
+
+  before do
+    @username = session['username']
+  end
+
   get '/reset' do
     ActiveRecord::Base.connection.execute 'select * from reset_db()'
     Pgvc.init ActiveRecord::Base.connection.raw_connection, default_branch: 'publish'
@@ -57,11 +63,17 @@ class App < Sinatra::Base
   # # checkout a branch
   # post '/branch'
 
-  # # display the products
-  # get '/'
+  # display the products
+  get '/' do
+    @products = Product.all
+    erb :root
+  end
 
-  # # login
-  # post '/session'
+  # login
+  post '/session' do
+    session['username'] = params['username']
+    redirect '/'
+  end
 
   # # logout
   # delete '/session'
