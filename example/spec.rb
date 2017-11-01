@@ -22,9 +22,12 @@ RSpec.describe App do
 
   describe '/reset' do
     it 'resets the database with the default branch being named "publish"' do
+      session.visit '/reset'
+      expect(session.status_code).to eq 200
       Product.create! name: 'lolol'
       expect(Product.find_by name: 'lolol').to_not eq nil
-      session.get '/reset'
+      session.visit '/reset'
+      expect(session.status_code).to eq 200
       expect(Product.find_by name: 'lolol').to eq nil
     end
   end
