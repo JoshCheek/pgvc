@@ -3,7 +3,7 @@ require_relative 'app'
 require 'capybara'
 
 RSpec.configure do |config|
-  config.fail_fast = true
+  # config.fail_fast = true
   config.color     = true
   config.formatter = 'documentation'
 end
@@ -18,6 +18,7 @@ RSpec.describe App do
     end
   end
 
+  before { Capybara.reset_sessions! }
   let(:session) { Capybara.current_session }
 
   def visit(*args)
@@ -32,6 +33,7 @@ RSpec.describe App do
       expect(Product.find_by name: 'lolol').to_not eq nil
       visit '/reset'
       expect(Product.find_by name: 'lolol').to eq nil
+      expect(session.current_path).to eq '/'
     end
   end
 
@@ -56,10 +58,51 @@ RSpec.describe App do
     end
   end
 
-  describe '/products' do
+  def login(name='Josh')
+    visit '/'
+    session.fill_in 'Username', with: name
+    session.find('input[name="Login"]').click
+  end
+
+  describe '/branches' do
+    specify 'redirects to root, for non-logged-in users' do
+      visit '/branches'
+      expect(session.current_path).to eq '/'
+    end
+    specify 'lists the branches and has a form to create a new branch' do
+      login
+      visit '/branches'
+      expect(session.all('.branch .name').map(&:text)).to eq ['publish']
+      session.fill_in 'Name', with: 'mahbranch'
+      session.find('input[name="Create Branch"]').click
+      expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
+    end
+    xspecify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete' do
+      login
+      visit '/branches'
+      expect(page.all('.branch .name').map(&:text)).to eq ['publish']
+      raise 'now do smth else'
+    end
+  end
+
+  describe '/branch' do
+    specify 'POST checks out a branch'
+  end
+
+  xdescribe '/products' do
     describe 'GET' do
-      it 'redirects to root, for non-logged-in users'
-      it 'displays the products, along with a form to edit them'
+      it 'redirects to root, for non-logged-in users' do
+        visit '/products'
+        expect(session.current_path).to eq '/'
+      end
+      it 'displays the products, along with a form to edit them' do
+        boots = Product.create name: 'boots', colour: 'green'
+        login
+        visit '/products'
+        expect(session.current_path).to eq '/products'
+        session.fill_in "product-#{boots.id} input[name=\"colour\"]", with: "black"
+        session.find("product-#{boots.id} input[name=\"Update\"]").click
+      end
       it 'has a link to create a new product'
     end
     describe 'POST' do
@@ -68,15 +111,5 @@ RSpec.describe App do
     describe 'PUT' do
       it 'updates an existing product on the user\'s branch'
     end
-  end
-
-  describe '/branches' do
-    specify 'GET lists the branches with the user\'s current branch highlighted'
-    specify 'POST creates a branch'
-    specify 'DELETE deletes a branch'
-  end
-
-  describe '/branch' do
-    specify 'POST checks out a branch'
   end
 end

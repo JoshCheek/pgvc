@@ -1,0 +1,20 @@
+<form action="/branches" method="post">
+  <label for="new_branch_name">Name</label>
+  <input id="new_branch_name" type="text" name="new_branch_name" />
+  <input type="submit" name="Create Branch" />
+</form>
+
+<table class="branches">
+  <tr>
+    <th>id</th>
+    <th>name</th>
+    <th>commit_hash</th>
+  </tr>
+  <% @branches.each do |branch| %>
+    <tr class="branch <%= "default" if branch.default? %>">
+      <td class="id"><%= branch.id %></td>
+      <td class="name"><%= branch.name %></td>
+      <td class="hash"><%= branch.commit_hash %></td>
+    </tr>
+  <% end %>
+</table>
