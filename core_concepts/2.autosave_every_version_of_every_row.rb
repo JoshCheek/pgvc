@@ -3,14 +3,14 @@ require_relative 'helpers'
 
 # Tables and Trigger
   sql <<~SQL
-    -- version controlled rows
+    -- Version controlled rows
     create extension hstore;
     create table vc_rows (
       vc_hash character (32) primary key,
       col_values hstore
     );
 
-    -- record changes to this table
+    -- Record changes to this table
     create table users (
       id      serial primary key,
       name    varchar,
@@ -35,7 +35,7 @@ require_relative 'helpers'
 
 
 # =====  INSERTION  =====
-  # adds hashes them and saves them into the version controlled rows table
+  # Adds hashes them and saves them into the version controlled rows table
   users1 = sql "insert into users (name) values ('Divya'), ('Darby') returning *"
   # => [#<Record id='1' name='Divya' vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981'>,
   #     #<Record id='2' name='Darby' vc_hash='7a3310ec4414b76ea5633cbab642ac9d'>]
@@ -56,14 +56,14 @@ require_relative 'helpers'
   sql "update users set name = 'Darby😜' where name = 'Darby'"
   users2 = sql 'select * from users order by id'
 
-  # hashes are updated
+  # Hashes are updated
   divya1, darby1 = users1 # => [#<Record id='1' name='Divya' vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981'>, #<Record id='2' name='Darby' vc_hash='7a3310ec4414b76ea5633cbab642ac9d'>]
   divya2, darby2 = users2 # => [#<Record id='1' name='Divya' vc_hash='c7a727b3c2e2fd691ef33eaa23ba9981'>, #<Record id='2' name='Darby😜' vc_hash='52c38b2824600ac5257e1ccb566d2e2d'>]
 
   eq! divya1.vc_hash, divya2.vc_hash # => 'c7a727b3c2e2fd691ef33eaa23ba9981'
   ne! darby1.vc_hash, darby2.vc_hash # => '52c38b2824600ac5257e1ccb566d2e2d'
 
-  # updated row is recorded, originals are still there
+  # Updated row is recorded, originals are still there
   vc2 = sql 'select * from vc_rows order by vc_hash'
   eq! vc2.map(&:vc_hash), [divya1, darby1, darby2].map(&:vc_hash).sort
   # => ['52c38b2824600ac5257e1ccb566d2e2d',
@@ -75,10 +75,10 @@ require_relative 'helpers'
   sql "update users set name = 'Darby' where name = 'Darby😜'"
   users3 = sql 'select * from users order by id'
 
-  # hashes return to old value
+  # Hashes return to old value
   eq! users1, users3
 
-  # update is not recorded, because it already existed
+  # Update is not recorded, because it already existed
   vc3 = sql 'select * from vc_rows order by vc_hash'
   eq! vc2, vc3
   # => [#<Record vc_hash='52c38b2824600ac5257e1ccb566d2e2d' col_values='"id"=>"2", "name"=>"Darby😜"'>,
