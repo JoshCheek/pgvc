@@ -54,7 +54,7 @@ db.exec 'select name, tweet from users join tweets on (tweets.user_id = users.id
 
 db.exec <<~SQL
   select move_associated_records(
-    'users', -- FIXME: THIS SHOULD BE USERS
+    'users',
     (select users from users where name = 'Josh'),
     (select users from users where name = 'Real Josh')
   );
@@ -64,5 +64,3 @@ db.exec 'select name, tweet from users join tweets on (tweets.user_id = users.id
 # => [{"name"=>"David", "tweet"=>"David tweet"},
 #     {"name"=>"Real Josh", "tweet"=>"Real Josh tweet"},
 #     {"name"=>"Real Josh", "tweet"=>"Josh tweet"}]
-
-

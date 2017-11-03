@@ -51,6 +51,10 @@ Ways to contribute
   then save them back into vc.rows, and updating anything that points at their value.
   Yes, this would be a change to history, but I'm comfortable with that, I don't
   have the need that git does, as all versions of the database will be stored here.
+  UPDATE: Looks like you can't grab the code that changed it, they only define `tg_tag` and `tg_event`,
+  which do not contain that information.
+  See [here](https://github.com/postgres/postgres/blob/f987f83de20afe3ba78be1e15db5dffe7488faa7/src/pl/plpgsql/src/pl_comp.c#L687-L715),
+  and [here](https://github.com/postgres/postgres/blob/f987f83de20afe3ba78be1e15db5dffe7488faa7/src/pl/plpgsql/src/pl_exec.c#L917-L924).
 * Would it make more sense to make a schema per user rather than a schema per branch?
 * Would be nice to have tags, which are like branches, except they don't get a schema,
   ie a way to name a commit
