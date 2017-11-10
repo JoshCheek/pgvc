@@ -137,6 +137,16 @@ class App < Sinatra::Base
     erb :edit_products
   end
 
+  # create a new product
+  post '/products' do
+    Product.create!(
+      name:   params['product']['name'],
+      colour: params['product']['colour'],
+    )
+    @products = Product.all
+    erb :edit_products
+  end
+
   # update a product
   post '/products/:id' do
     Product.find(params['id']).update_attributes(

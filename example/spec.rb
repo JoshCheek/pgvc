@@ -108,34 +108,42 @@ RSpec.describe App do
   end
 
 
-  describe '/products' do
-    describe 'GET' do
-      it 'redirects to root, for non-logged-in users' do
-        visit '/products'
-        expect(session.current_path).to eq '/'
-      end
+  describe 'editing products' do
+    it 'redirects to root, for non-logged-in users' do
+      # FIXME: Just don't display the link,
+      # this is just a demo, it's not worth trying to add proper auth
+      visit '/products'
+      expect(session.current_path).to eq '/'
+    end
 
-      it 'displays the products, along with a form to edit them' do
-        boots = Product.create! name: 'boots', colour: 'green'
-        login
-        visit '/products'
-        expect(session.current_path).to eq '/products'
-        session.within session.find("#product-#{boots.id}") do
-          session.fill_in "product[colour]", with: "black"
-          session.click_on 'Update'
-        end
-        expect(session.current_path).to eq '/products'
-        boots.reload
-        expect(boots.name).to eq 'boots'
-        expect(boots.colour).to eq 'black'
+    it 'displays the products, along with a form to edit/delete them, on the current branch' do
+      boots = Product.create! name: 'boots', colour: 'green'
+      login
+      session.click_on 'Edit'
+      expect(session.current_path).to eq '/products'
+      session.within session.find("#product-#{boots.id}") do
+        session.fill_in "product[colour]", with: "black"
+        session.click_on 'Update'
       end
-      it 'has a form to create a new product'
+      expect(session.current_path).to eq '/products'
+      boots.reload
+      expect(boots.name).to eq 'boots'
+      expect(boots.colour).to eq 'black'
+      # FIXME: assert that the edit happened on the branch
+      # FIXME: Need to delete
     end
-    describe 'POST' do
-      it 'creates a new product on the user\'s branch'
-    end
-    describe 'PUT' do
-      it 'updates an existing product on the user\'s branch'
+
+    it 'has a form to create a new product on the given branch' do
+      login
+      session.click_on 'Edit'
+      expect(session.body).to_not include 'raincoat'
+      session.within session.find('#new-product') do
+        session.fill_in 'product[name]', with: 'raincoat'
+        session.fill_in 'product[colour]', with: 'yellow'
+        session.click_on 'Create'
+      end
+      expect(session.body).to include 'raincoat'
+      # FIXME: assert that it was created on the branch
     end
   end
 end
