@@ -28,7 +28,6 @@
       </td>
       <td class="delete">
         <form action="/branches" method="post">
-          <!-- browsers are dumb -->
           <input type="hidden" name="_method" value="DELETE">
           <input type="hidden" name="branch[name]" value="<%= branch.name %>" />
           <input type="submit" name="checkout" value="delete" />

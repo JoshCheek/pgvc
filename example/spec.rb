@@ -54,6 +54,7 @@ RSpec.describe App do
       expect(session.body).to include 'Josh'
       expect(session.body).to_not include 'Login'
       session.find('input[name="Logout"]').click
+      expect(session.current_path).to eq '/'
       expect(session.body).to_not include 'Josh'
     end
   end

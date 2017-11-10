@@ -7,7 +7,8 @@
     <div>
       <% if @username %>
         <div>You are logged in as <%= @username %></div>
-        <form action="/session" method="delete">
+        <form action="/session" method="post">
+          <input type="hidden" name="_method" value="DELETE">
           <input type="submit" name="Logout" />
         </form>
       <% else %>

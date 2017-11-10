@@ -122,6 +122,9 @@ class App < Sinatra::Base
     redirect '/'
   end
 
-  # # logout
-  # delete '/session'
+  # logout
+  delete '/session' do
+    session.clear
+    redirect '/'
+  end
 end
