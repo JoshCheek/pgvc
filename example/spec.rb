@@ -26,37 +26,13 @@ RSpec.describe App do
     expect(session.status_code).to eq 200
   end
 
-  describe '/reset' do
-    it 'has a button to reset the database with the default branch being named "publish"' do
-      visit '/'
-      session.click_on 'Reset'
-      Product.create! name: 'lolol'
-      expect(Product.find_by name: 'lolol').to_not eq nil
-      visit '/reset'
-      expect(Product.find_by name: 'lolol').to eq nil
-      expect(session.current_path).to eq '/'
-    end
-  end
-
-  describe '/' do
-    it 'lists the products on the publish branch' do
-      Product.create! name: 'p1', colour: 'c1'
-      Product.create! name: 'p2', colour: 'c2'
-      visit '/'
-      expect(session.body.scan /\b[pc]\d+\b/).to eq %w[p1 c1 p2 c2]
-    end
-
-    it 'has a login form or a logout button' do
-      visit '/'
-      expect(session.body).to_not include 'Josh'
-      session.fill_in 'username', with: 'Josh'
-      session.click_on 'Login'
-      expect(session.current_path).to eq '/'
-      expect(session.body).to include 'Josh'
-      expect(session.body).to_not include 'Login'
-      session.click_on 'Logout'
-      expect(session.current_path).to eq '/'
-      expect(session.body).to_not include 'Josh'
+  def create_product(name:, colour:)
+    session.click_on 'Edit'
+    expect(session.body).to_not include 'raincoat'
+    session.within session.find('#new-product') do
+      session.fill_in 'product[name]', with: name
+      session.fill_in 'product[colour]', with: colour
+      session.click_on 'Create'
     end
   end
 
@@ -89,6 +65,40 @@ RSpec.describe App do
 
   def assert_current_branch(name)
     expect(session.find '.current_branch').to have_text name
+  end
+
+  describe '/reset' do
+    it 'has a button to reset the database with the default branch being named "publish"' do
+      visit '/'
+      session.click_on 'Reset'
+      Product.create! name: 'lolol'
+      expect(Product.find_by name: 'lolol').to_not eq nil
+      visit '/reset'
+      expect(Product.find_by name: 'lolol').to eq nil
+      expect(session.current_path).to eq '/'
+    end
+  end
+
+  describe '/' do
+    it 'lists the products on the publish branch' do
+      Product.create! name: 'p1', colour: 'c1'
+      Product.create! name: 'p2', colour: 'c2'
+      visit '/'
+      expect(session.body.scan /\b[pc]\d+\b/).to eq %w[p1 c1 p2 c2]
+    end
+
+    it 'has a login form or a logout button' do
+      visit '/'
+      expect(session.body).to_not include 'Josh'
+      session.fill_in 'username', with: 'Josh'
+      session.click_on 'Login'
+      expect(session.current_path).to eq '/'
+      expect(session.body).to include 'Josh'
+      expect(session.body).to_not include 'Login'
+      session.click_on 'Logout'
+      expect(session.current_path).to eq '/'
+      expect(session.body).to_not include 'Josh'
+    end
   end
 
   describe 'branches' do
@@ -171,22 +181,37 @@ RSpec.describe App do
       # FIXME: Need to delete
     end
 
+
     it 'has a form to create a new product on the given branch' do
       login
       create_and_checkout_branch 'bananamuffin'
 
-      session.click_on 'Edit'
-      expect(session.body).to_not include 'raincoat'
-      session.within session.find('#new-product') do
-        session.fill_in 'product[name]', with: 'raincoat'
-        session.fill_in 'product[colour]', with: 'yellow'
-        session.click_on 'Create'
-      end
+      create_product name: 'raincoat', colour: 'yellow'
       expect(session.body).to include 'raincoat'
 
       checkout_branch 'publish'
       session.click_on 'Edit'
       expect(session.body).to_not include 'raincoat'
     end
+  end
+
+
+  describe 'diffing' do
+    before { login }
+    it 'allows you to see your working changes', t:true do
+      create_product name: 'barrel', colour: 'brown'
+      barrel = Product.find_by! name: 'barrel'
+      session.click_on 'Diff'
+      rows = session.all('.diff .row').map(&:text)
+      expect(rows).to eq [
+        "insert #{barrel.id} barrel brown"
+      ]
+    end
+    it 'allows you to diff against another commit'
+  end
+
+
+  describe 'history' do
+    it 'shows you the commits that led to your current state'
   end
 end

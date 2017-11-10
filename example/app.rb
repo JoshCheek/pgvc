@@ -153,4 +153,17 @@ class App < Sinatra::Base
     )
     redirect '/products'
   end
+
+  # view diff
+  get '/diff' do
+    @rows = git.exec <<~SQL
+      select d.action,
+         r.data->'id'     as id,
+         r.data->'name'   as name,
+         r.data->'colour' as colour
+      from git.diff() d
+      join vc.rows r using (vc_hash);
+    SQL
+    erb :diff
+  end
 end

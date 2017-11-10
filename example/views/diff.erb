@@ -1,0 +1,18 @@
+<h2>Diff</h2>
+
+<table class="diff">
+  <tr>
+    <th>Action</th>
+    <th>Id</th>
+    <th>Name</th>
+    <th>Colour</th>
+  </tr>
+  <% @rows.each do |row| %>
+    <tr class="row row_<%= row.action %>">
+      <td><%= row.action %></td>
+      <td><%= row.id %></td>
+      <td><%= row.name %></td>
+      <td><%= row.colour %></td>
+    </tr>
+  <% end %>
+</table>
