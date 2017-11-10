@@ -67,6 +67,7 @@ RSpec.describe App do
 
   describe 'branches' do
     specify 'does not show the link to non-logged-in users' do
+      # This is just a demo, it's not worth trying to add proper auth
       visit '/'
       expect(session).to_not have_link 'branches'
     end
@@ -110,10 +111,8 @@ RSpec.describe App do
 
   describe 'editing products' do
     it 'redirects to root, for non-logged-in users' do
-      # FIXME: Just don't display the link,
-      # this is just a demo, it's not worth trying to add proper auth
-      visit '/products'
-      expect(session.current_path).to eq '/'
+      visit '/'
+      expect(session).to_not have_link 'Edit'
     end
 
     it 'displays the products, along with a form to edit/delete them, on the current branch' do

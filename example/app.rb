@@ -99,14 +99,12 @@ class App < Sinatra::Base
 
   # see all branches
   get '/branches' do
-    redirect '/' unless logged_in?
     @branches = git.branch
     erb :branches
   end
 
   # create a new branch
   post '/branches' do
-    redirect '/' unless logged_in? # not actually tested
     git.branch params['new_branch_name']
     @branches = git.branch
     erb :branches
@@ -132,7 +130,6 @@ class App < Sinatra::Base
 
   # forms to edit the products
   get '/products' do
-    next redirect '/' unless logged_in?
     @products = Product.all
     erb :edit_products
   end
