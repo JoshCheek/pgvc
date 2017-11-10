@@ -66,6 +66,30 @@ RSpec.describe App do
     session.click_on 'Login'
   end
 
+  def create_branch(name)
+    session.visit '/'
+    session.click_on 'Branches'
+    session.fill_in 'Name', with: name
+    session.click_on 'Create Branch'
+  end
+
+  def checkout_branch(name)
+    branches = session.all '.branch'
+    mahbranch = branches.find { |b| b.text.include? name }
+    session.within mahbranch do
+      session.click_on 'checkout'
+    end
+  end
+
+  def create_and_checkout_branch(name)
+    create_branch name
+    checkout_branch name
+  end
+
+  def assert_current_branch(name)
+    expect(session.find '.current_branch').to have_text name
+  end
+
   describe 'branches' do
     specify 'does not show the link to non-logged-in users' do
       # This is just a demo, it's not worth trying to add proper auth
@@ -85,19 +109,12 @@ RSpec.describe App do
     specify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete' do
       # create the branch
       login
-      session.visit '/'
-      session.click_on 'Branches'
-      session.fill_in 'Name', with: 'mahbranch'
-      session.click_on 'Create Branch'
+      create_branch 'mahbranch'
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
 
       # check it out
       expect(session.find('.branch.current .name').text).to eq 'publish'
-      branches = session.all '.branch'
-      mahbranch = branches.find { |b| b.text.include? 'mahbranch' }
-      session.within mahbranch do
-        session.click_on 'checkout'
-      end
+      checkout_branch 'mahbranch'
       expect(session.find('.branch.current .name').text).to eq 'mahbranch'
 
       # delete it
@@ -106,6 +123,15 @@ RSpec.describe App do
       end
       expect(session.body).to_not include 'mahbranch'
       expect(session.find('.branch.current .name').text).to eq 'publish'
+    end
+
+    specify 'Tells you your current branch in the header' do
+      login
+      assert_current_branch 'publish'
+      create_and_checkout_branch 'brizanch'
+      assert_current_branch 'brizanch'
+      checkout_branch 'publish'
+      assert_current_branch 'publish'
     end
   end
 

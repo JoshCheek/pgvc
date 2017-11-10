@@ -5,6 +5,7 @@
   </head>
   <body>
     <div>
+
       <% if @username %>
         <div>You are logged in as <%= @username %></div>
         <form action="/session" method="post">
@@ -19,7 +20,12 @@
           <input type="submit" name="login" value="Login" />
         </form>
       <% end %>
+
       <a href="/reset">Reset</a>
+      <div>
+        Current branch:
+        <span class="current_branch"><%= @branch.name %></span>
+      </span>
     </div>
     <%= yield %>
   </body>
