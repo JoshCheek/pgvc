@@ -77,6 +77,18 @@ class App < Sinatra::Base
 
 
 
+  # login
+  post '/session' do
+    session['username'] = params['username']
+    redirect '/'
+  end
+
+  # logout
+  delete '/session' do
+    session.clear
+    redirect '/'
+  end
+
   get '/reset' do
     pg_connection.exec 'select * from reset_db()'
     Pgvc.init pg_connection, default_branch: 'publish'
@@ -116,15 +128,10 @@ class App < Sinatra::Base
     erb :root
   end
 
-  # login
-  post '/session' do
-    session['username'] = params['username']
-    redirect '/'
-  end
-
-  # logout
-  delete '/session' do
-    session.clear
-    redirect '/'
+  # edit the products
+  get '/products' do
+    next redirect '/' unless logged_in?
+    # @products = Product.all
+    # erb :root
   end
 end

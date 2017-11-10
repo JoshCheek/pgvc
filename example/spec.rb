@@ -80,7 +80,7 @@ RSpec.describe App do
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
     end
 
-    specify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete', t:true do
+    specify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete' do
       # create the branch
       login
       visit '/branches'
@@ -107,13 +107,13 @@ RSpec.describe App do
   end
 
 
-  xdescribe '/products' do
+  describe '/products' do
     describe 'GET' do
       it 'redirects to root, for non-logged-in users' do
         visit '/products'
         expect(session.current_path).to eq '/'
       end
-      it 'displays the products, along with a form to edit them' do
+      xit 'displays the products, along with a form to edit them', t:true do
         boots = Product.create name: 'boots', colour: 'green'
         login
         visit '/products'
