@@ -67,18 +67,19 @@ RSpec.describe App do
   end
 
   def create_branch(name)
-    session.visit '/'
     session.click_on 'Branches'
     session.fill_in 'Name', with: name
     session.click_on 'Create Branch'
   end
 
   def checkout_branch(name)
+    session.click_on 'Branches'
     branches = session.all '.branch'
-    mahbranch = branches.find { |b| b.text.include? name }
-    session.within mahbranch do
+    branch_name = branches.find { |b| b.text.include? name }
+    session.within branch_name do
       session.click_on 'checkout'
     end
+    assert_current_branch name
   end
 
   def create_and_checkout_branch(name)
@@ -142,9 +143,11 @@ RSpec.describe App do
       expect(session).to_not have_link 'Edit'
     end
 
-    it 'displays the products, along with a form to edit/delete them, on the current branch' do
+    it 'displays the products, along with a form to edit them, on the current branch' do
       boots = Product.create! name: 'boots', colour: 'green'
       login
+
+      # Edit the boots
       session.click_on 'Edit'
       expect(session.current_path).to eq '/products'
       session.within session.find("#product-#{boots.id}") do
@@ -155,12 +158,23 @@ RSpec.describe App do
       boots.reload
       expect(boots.name).to eq 'boots'
       expect(boots.colour).to eq 'black'
-      # FIXME: assert that the edit happened on the branch
+
+      # Switch branches and we shouldn't see the boots
+      create_and_checkout_branch 'zomghi'
+
+      # Now we don't see the boots (the change was not committed)
+      session.click_on 'Edit'
+      expect(session.body).to_not include 'boots'
+    end
+
+    xit 'allows them to be deleted on the current branch' do
       # FIXME: Need to delete
     end
 
     it 'has a form to create a new product on the given branch' do
       login
+      create_and_checkout_branch 'bananamuffin'
+
       session.click_on 'Edit'
       expect(session.body).to_not include 'raincoat'
       session.within session.find('#new-product') do
@@ -169,7 +183,10 @@ RSpec.describe App do
         session.click_on 'Create'
       end
       expect(session.body).to include 'raincoat'
-      # FIXME: assert that it was created on the branch
+
+      checkout_branch 'publish'
+      session.click_on 'Edit'
+      expect(session.body).to_not include 'raincoat'
     end
   end
 end

@@ -93,7 +93,8 @@ class App < Sinatra::Base
 
   get '/reset' do
     pg_connection.exec 'select * from reset_db()'
-    Pgvc.init pg_connection, default_branch: 'publish'
+    pgvc = Pgvc.init pg_connection, default_branch: 'publish'
+    pgvc.track_table 'products'
     redirect '/'
   end
 
