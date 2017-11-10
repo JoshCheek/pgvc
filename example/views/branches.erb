@@ -1,8 +1,30 @@
-<form action="/branches" method="post">
-  <label for="new_branch_name">Name</label>
-  <input id="new_branch_name" type="text" name="new_branch_name" />
-  <input type="submit" value="Create Branch" />
+<style>
+.branches tr:nth-child(even) {
+  background-color: #804915;
+  color: #D49E6A;
+}
+.branches td {
+  padding: 0.25em 1em;
+}
+.create_branch {
+  margin-bottom: 2em;
+}
+.branches input {
+  background-color: transparent;
+  border: none;
+  color: #550800;
+}
+</style>
+
+
+<h2>Branches</h2>
+
+<form class="create_branch" action="/branches" method="post">
+  <input id="new_branch_name" type="text" name="new_branch_name" placeholder="my-branch-name" />
+  <input type="submit" value="Create" />
 </form>
+
+
 
 <table class="branches">
   <tr>

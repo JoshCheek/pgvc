@@ -125,13 +125,13 @@ class App < Sinatra::Base
 
   # display the products
   get '/' do
-    @products = Product.all
+    @products = Product.order(:id)
     erb :root
   end
 
   # forms to edit the products
   get '/products' do
-    @products = Product.all
+    @products = Product.order(:id)
     erb :edit_products
   end
 
@@ -141,8 +141,7 @@ class App < Sinatra::Base
       name:   params['product']['name'],
       colour: params['product']['colour'],
     )
-    @products = Product.all
-    erb :edit_products
+    redirect '/products'
   end
 
   # update a product

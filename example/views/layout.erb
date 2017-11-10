@@ -2,16 +2,68 @@
 <html>
   <head>
     <title>Pgvc demo</title>
+    <style>
+      /* Palette URL: http://paletton.com/#uid=50y0u0kllllaFw0g0qFqFg0w0aF */
+      .color-primary-0 { color: #AA7039 }	/* Main Primary color */
+      .color-primary-1 { color: #FFD4AA }
+      .color-primary-2 { color: #D49E6A }
+      .color-primary-3 { color: #804915 }
+      .color-primary-4 { color: #552900 }
+
+      .color-secondary-1-0 { color: #AA8739 }	/* Main Secondary color (1) */
+      .color-secondary-1-1 { color: #FFE5AA }
+      .color-secondary-1-2 { color: #D4B36A }
+      .color-secondary-1-3 { color: #805F15 }
+      .color-secondary-1-4 { color: #553B00 }
+
+      .color-secondary-2-0 { color: #AA4339 }	/* Main Secondary color (2) */
+      .color-secondary-2-1 { color: #FFB2AA }
+      .color-secondary-2-2 { color: #D4746A }
+      .color-secondary-2-3 { color: #801F15 }
+      .color-secondary-2-4 { color: #550800 }
+
+      body {
+        padding:          3em;
+        font-family:      sans-serif;
+        font-size:        2em;
+        background-color: #D49E6A;
+        color:            #553B00;
+      }
+      a {
+        color: #550800;
+        text-decoration: none;
+      }
+      input {
+        font-size:        1em;
+        color:            #553B00;
+      }
+      .navigation {
+        display: block;
+        border-bottom: 0.1em solid #804915;
+        padding-bottom: 1em;
+        margin-bottom: 1em;
+      }
+      .navigation > * {
+        display: inline-block;
+      }
+      .navigation > * + * {
+        padding-left: 2em;
+      }
+      .logout * {
+        display: inline-block;
+      }
+    </style>
   </head>
   <body>
-    <div>
-
+    <div class="navigation">
       <% if @username %>
-        <div>You are logged in as <%= @username %></div>
-        <form action="/session" method="post">
-          <input type="hidden" name="_method" value="DELETE">
-          <input type="submit" name="Logout" value="Logout" />
-        </form>
+        <div class="logout">
+          <%= @username %>
+          <form action="/session" method="post">
+            <input type="hidden" name="_method" value="DELETE" />
+            <input type="submit" name="Logout" value="Logout" />
+          </form>
+        </div>
         <a href="/branches">Branches</a>
         <a href="/products">Edit</a>
         <a href="/diff">Diff</a>
@@ -26,8 +78,9 @@
       <div>
         Current branch:
         <span class="current_branch"><%= @branch.name %></span>
-      </span>
+      </div>
     </div>
+
     <%= yield %>
   </body>
 </html>

@@ -44,8 +44,8 @@ RSpec.describe App do
 
   def create_branch(name)
     session.click_on 'Branches'
-    session.fill_in 'Name', with: name
-    session.click_on 'Create Branch'
+    session.fill_in 'new_branch_name', with: name
+    session.click_on 'Create'
   end
 
   def checkout_branch(name)
@@ -112,8 +112,8 @@ RSpec.describe App do
       login
       session.click_on 'Branches'
       expect(session.all('.branch .name').map(&:text)).to eq ['publish']
-      session.fill_in 'Name', with: 'mahbranch'
-      session.click_on 'Create Branch'
+      session.fill_in 'new_branch_name', with: 'mahbranch'
+      session.click_on 'Create'
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
     end
 
