@@ -48,12 +48,12 @@ RSpec.describe App do
     it 'has a login form or a logout button' do
       visit '/'
       expect(session.body).to_not include 'Josh'
-      session.fill_in 'Username', with: 'Josh'
-      session.find('input[name="Login"]').click
+      session.fill_in 'username', with: 'Josh'
+      session.click_on 'Login'
       expect(session.current_path).to eq '/'
       expect(session.body).to include 'Josh'
       expect(session.body).to_not include 'Login'
-      session.find('input[name="Logout"]').click
+      session.click_on 'Logout'
       expect(session.current_path).to eq '/'
       expect(session.body).to_not include 'Josh'
     end
@@ -61,8 +61,8 @@ RSpec.describe App do
 
   def login(name='Josh')
     visit '/'
-    session.fill_in 'Username', with: name
-    session.find('input[name="Login"]').click
+    session.fill_in 'username', with: name
+    session.click_on 'Login'
   end
 
   describe 'branches' do

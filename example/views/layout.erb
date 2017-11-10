@@ -9,16 +9,13 @@
         <div>You are logged in as <%= @username %></div>
         <form action="/session" method="post">
           <input type="hidden" name="_method" value="DELETE">
-          <!-- FIXME: needs a value of "Logout" -->
-          <input type="submit" name="Logout" />
+          <input type="submit" name="Logout" value="Logout" />
         </form>
         <a href="/branches">Branches</a>
       <% else %>
         <form action="/session" method="post">
-          <label for="username">Username</label>
           <input id="username" type="text" name="username" />
-          <!-- FIXME: needs a value of "Login" -->
-          <input type="submit" name="Login" />
+          <input type="submit" name="login" value="Login" />
         </form>
       <% end %>
     </div>
