@@ -113,15 +113,21 @@ RSpec.describe App do
         visit '/products'
         expect(session.current_path).to eq '/'
       end
-      xit 'displays the products, along with a form to edit them', t:true do
-        boots = Product.create name: 'boots', colour: 'green'
+      it 'displays the products, along with a form to edit them' do
+        boots = Product.create! name: 'boots', colour: 'green'
         login
         visit '/products'
         expect(session.current_path).to eq '/products'
-        session.fill_in "product-#{boots.id} input[name=\"colour\"]", with: "black"
-        session.find("product-#{boots.id} input[name=\"Update\"]").click
+        session.within session.find("#product-#{boots.id}") do
+          session.fill_in "product[colour]", with: "black"
+          session.click_on 'Update'
+        end
+        expect(session.current_path).to eq '/products'
+        boots.reload
+        expect(boots.name).to eq 'boots'
+        expect(boots.colour).to eq 'black'
       end
-      it 'has a link to create a new product'
+      it 'has a form to create a new product'
     end
     describe 'POST' do
       it 'creates a new product on the user\'s branch'

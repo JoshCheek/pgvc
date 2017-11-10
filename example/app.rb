@@ -23,7 +23,7 @@ create or replace function reset_db() returns void as $$
     drop table if exists users;
     drop table if exists products;
     create table products (
-      id serial,
+      id serial primary key,
       name text,
       colour text
     );
@@ -33,6 +33,8 @@ SQL
 
 class Product < ActiveRecord::Base
 end
+
+# Product.create! name: 'boots', colour: 'blue'
 
 $LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 require 'pgvc/git'
@@ -128,10 +130,19 @@ class App < Sinatra::Base
     erb :root
   end
 
-  # edit the products
+  # forms to edit the products
   get '/products' do
     next redirect '/' unless logged_in?
-    # @products = Product.all
-    # erb :root
+    @products = Product.all
+    erb :edit_products
+  end
+
+  # update a product
+  post '/products/:id' do
+    Product.find(params['id']).update_attributes(
+      name:   params['product']['name'],
+      colour: params['product']['colour'],
+    )
+    redirect '/products'
   end
 end

@@ -1,0 +1,22 @@
+<style>
+.products  { display: table; }
+.product   { display: table-row; }
+.product * { display: table-cell; }
+</style>
+
+
+<h2>Edit Products</h2>
+
+<div class="products">
+  <% @products.each do |product| %>
+    <form action="/products/<%= product.id %>"
+          method="post"
+          class="product"
+          id="product-<%= product.id %>">
+      <span><%= product.id %></span>
+      <input type="text" name="product[name]"   value="<%= product.name %>" />
+      <input type="text" name="product[colour]" value="<%= product.colour %>" />
+      <input type="submit" name="Update" value="Update" />
+    </form>
+  <% end %>
+</div>
