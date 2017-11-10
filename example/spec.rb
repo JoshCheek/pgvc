@@ -27,8 +27,9 @@ RSpec.describe App do
   end
 
   describe '/reset' do
-    it 'resets the database with the default branch being named "publish"' do
-      visit '/reset'
+    it 'has a button to reset the database with the default branch being named "publish"' do
+      visit '/'
+      session.click_on 'Reset'
       Product.create! name: 'lolol'
       expect(Product.find_by name: 'lolol').to_not eq nil
       visit '/reset'
