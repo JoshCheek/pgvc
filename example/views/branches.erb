@@ -1,0 +1,60 @@
+<style>
+.branches tr:nth-child(even) {
+  background-color: #804915;
+  color: #D49E6A;
+}
+.branches td {
+  padding: 0.25em 1em;
+}
+.create_branch {
+  margin-bottom: 2em;
+}
+.branches input {
+  background-color: transparent;
+  border: none;
+  color: #550800;
+}
+</style>
+
+
+<h2>Branches</h2>
+
+<form class="create_branch" action="/branches" method="post">
+  <input id="new_branch_name" type="text" name="new_branch_name" placeholder="my-branch-name" />
+  <input type="submit" value="Create" />
+</form>
+
+
+
+<table class="branches">
+  <tr>
+    <th>id</th>
+    <th>name</th>
+    <th>commit_hash</th>
+  </tr>
+  <% @branches.each do |branch| %>
+    <%
+      css_class = "branch"
+      css_class << " default" if branch.default?
+      css_class << " current" if branch.current?
+    %>
+    <tr class="<%= css_class %>">
+      <td class="id"><%= branch.id %></td>
+      <td class="name"><%= branch.name %></td>
+      <td class="hash"><%= branch.commit_hash %></td>
+      <td class="checkout">
+        <form action="/branch" method="post">
+          <input type="hidden" name="branch[name]" value="<%= branch.name %>" />
+          <input type="submit" name="checkout" value="checkout" />
+        </form>
+      </td>
+      <td class="delete">
+        <form action="/branches" method="post">
+          <input type="hidden" name="_method" value="DELETE">
+          <input type="hidden" name="branch[name]" value="<%= branch.name %>" />
+          <input type="submit" name="checkout" value="delete" />
+        </form>
+      </td>
+    </tr>
+  <% end %>
+</table>

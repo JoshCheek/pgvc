@@ -1,0 +1,26 @@
+<style>
+.commit-form {
+  width: 75%;
+}
+.commit-form > * {
+  display: block;
+  margin-bottom: 1em;
+}
+.commit-form .summary {
+  width: 100%;
+}
+.commit-form textarea {
+  font-size: 1em;
+  width: 100%;
+}
+</style>
+
+<h2>Commit</h2>
+
+
+<form class="commit-form" action="/commit" method="post">
+  <input class="summary" type="text" name="commit[summary]" placeholder="summary" />
+  <textarea name="commit[description]" rows="10" cols="80">
+  </textarea>
+  <input type="submit" name="save" value="Save" />
+</form>

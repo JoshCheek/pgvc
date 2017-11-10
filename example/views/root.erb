@@ -1,0 +1,26 @@
+<h2>Products</h2>
+
+<style>
+.products tr:nth-child(even) {
+  background-color: #804915;
+  color: #D49E6A;
+}
+.products td {
+  padding: 0.25em 1em;
+}
+</style>
+
+<table class="products">
+  <tr>
+    <th>id</th>
+    <th>name</th>
+    <th>colour</th>
+  </tr>
+  <% @products.each do |product| %>
+    <tr>
+      <td><%= product.id     %></td>
+      <td><%= product.name   %></td>
+      <td><%= product.colour %></td>
+    </tr>
+  <% end %>
+</table>

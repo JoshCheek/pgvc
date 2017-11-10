@@ -1,0 +1,41 @@
+<style>
+.products {
+  display: table;
+}
+.product {
+  display: table-row;
+}
+.product * {
+  display: table-cell;
+  padding: 0.25em 1em;
+  margin-bottom: 0.25em;
+}
+.product *:last-child {
+  margin-left: 0.25em;
+}
+</style>
+
+<h2>Create a product</h2>
+
+<form id="new-product" action="/products" method="post">
+  <input type="text" name="product[name]" autofocus placeholder="name"/>
+  <input type="text" name="product[colour]" placeholder="colour" />
+  <input type="submit" name="Update" value="Create" />
+</form>
+
+
+<h2>Edit Products</h2>
+
+<div class="products">
+  <% @products.each do |product| %>
+    <form action="/products/<%= product.id %>"
+          method="post"
+          class="product"
+          id="product-<%= product.id %>">
+      <span><%= product.id %></span>
+      <input type="text" name="product[name]"   value="<%= product.name %>" />
+      <input type="text" name="product[colour]" value="<%= product.colour %>" />
+      <input type="submit" name="Update" value="Update" />
+    </form>
+  <% end %>
+</div>
