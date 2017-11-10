@@ -65,15 +65,15 @@ RSpec.describe App do
     session.find('input[name="Login"]').click
   end
 
-  describe '/branches' do
-    specify 'redirects to root, for non-logged-in users' do
-      visit '/branches'
-      expect(session.current_path).to eq '/'
+  describe 'branches' do
+    specify 'does not show the link to non-logged-in users' do
+      visit '/'
+      expect(session).to_not have_link 'branches'
     end
 
     specify 'lists the branches and has a form to create a new branch' do
       login
-      visit '/branches'
+      session.click_on 'Branches'
       expect(session.all('.branch .name').map(&:text)).to eq ['publish']
       session.fill_in 'Name', with: 'mahbranch'
       session.find('input[name="Create Branch"]').click
@@ -83,7 +83,8 @@ RSpec.describe App do
     specify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete' do
       # create the branch
       login
-      visit '/branches'
+      session.visit '/'
+      session.click_on 'Branches'
       session.fill_in 'Name', with: 'mahbranch'
       session.find('input[name="Create Branch"]').click
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
@@ -113,6 +114,7 @@ RSpec.describe App do
         visit '/products'
         expect(session.current_path).to eq '/'
       end
+
       it 'displays the products, along with a form to edit them' do
         boots = Product.create! name: 'boots', colour: 'green'
         login
