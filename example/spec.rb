@@ -69,6 +69,7 @@ RSpec.describe App do
       visit '/branches'
       expect(session.current_path).to eq '/'
     end
+
     specify 'lists the branches and has a form to create a new branch' do
       login
       visit '/branches'
@@ -77,12 +78,16 @@ RSpec.describe App do
       session.find('input[name="Create Branch"]').click
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
     end
-    specify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete' do
+
+    specify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete', t:true do
+      # create the branch
       login
       visit '/branches'
       session.fill_in 'Name', with: 'mahbranch'
       session.find('input[name="Create Branch"]').click
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
+
+      # check it out
       expect(session.find('.branch.current .name').text).to eq 'publish'
       branches = session.all '.branch'
       mahbranch = branches.find { |b| b.text.include? 'mahbranch' }
@@ -90,12 +95,16 @@ RSpec.describe App do
         session.click_on 'checkout'
       end
       expect(session.find('.branch.current .name').text).to eq 'mahbranch'
+
+      # delete it
+      session.within '.branch.current' do
+        session.click_on 'delete'
+      end
+      expect(session.body).to_not include 'mahbranch'
+      expect(session.find('.branch.current .name').text).to eq 'publish'
     end
   end
 
-  describe '/branch' do
-    specify 'POST checks out a branch'
-  end
 
   xdescribe '/products' do
     describe 'GET' do

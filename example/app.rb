@@ -40,10 +40,16 @@ require 'pgvc/git'
 
 class App < Sinatra::Base
   enable :sessions
+  use Rack::MethodOverride # allows _method since browsers don't respect the method specified on the form
 
   before { @username = session['username'] }
   attr_reader :username, :branch, :git
   alias logged_in? username
+
+  # before do
+  #   print env['REQUEST_METHOD'], "\t", env['PATH_INFO'], "\n"
+  #   p params
+  # end
 
   def call(env)
     ActiveRecord::Base.connection_pool.with_connection do |ar_conn|
@@ -92,10 +98,13 @@ class App < Sinatra::Base
     erb :branches
   end
 
-  # # delete a branch
-  # delete '/branches'
+  # delete a branch
+  delete '/branches' do
+    pgvc.delete_branch params['branch']['name']
+    redirect '/branches'
+  end
 
-  # # checkout a branch
+  # checkout a branch
   post '/branch' do
     git.checkout params['branch']['name']
     redirect '/branches'
