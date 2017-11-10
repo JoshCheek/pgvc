@@ -64,9 +64,12 @@
             <input type="submit" name="Logout" value="Logout" />
           </form>
         </div>
-        <a href="/branches">Branches</a>
+        <a href="/">View</a>
         <a href="/products">Edit</a>
+        <a href="/branches">Branches</a>
         <a href="/diff">Diff</a>
+        <a href="/commit">Commit</a>
+        <a href="/history">History</a>
       <% else %>
         <form action="/session" method="post">
           <input id="username" type="text" name="username" />

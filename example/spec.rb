@@ -73,7 +73,7 @@ RSpec.describe App do
       session.click_on 'Reset'
       Product.create! name: 'lolol'
       expect(Product.find_by name: 'lolol').to_not eq nil
-      visit '/reset'
+      session.click_on 'Reset'
       expect(Product.find_by name: 'lolol').to eq nil
       expect(session.current_path).to eq '/'
     end
@@ -198,7 +198,7 @@ RSpec.describe App do
 
   describe 'diffing' do
     before { login }
-    it 'allows you to see your working changes', t:true do
+    it 'allows you to see your working changes' do
       create_product name: 'barrel', colour: 'brown'
       barrel = Product.find_by! name: 'barrel'
       session.click_on 'Diff'
@@ -212,6 +212,20 @@ RSpec.describe App do
 
 
   describe 'history' do
-    it 'shows you the commits that led to your current state'
+    it 'allows you to commit your changes and view them in the history' do
+      login 'Josh'
+      create_product name: 'fox', colour: 'fire'
+      session.click_on 'Commit'
+      session.fill_in 'commit[summary]', with: 'Add firefox'
+      session.fill_in 'commit[description]', with: 'New products, w00t!'
+      session.click_on 'Save'
+      session.click_on 'History'
+      entry = session.all('.history .entry').first
+      hash, created_at, user, explanation = entry.all('td').map(&:text)
+      how_long_ago = (Time.now - Time.parse(created_at))
+      expect(how_long_ago).to be < 2 # seconds
+      expect(user).to eq 'Josh'
+      expect(explanation).to eq 'Add firefox New products, w00t!'
+    end
   end
 end

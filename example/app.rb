@@ -95,6 +95,11 @@ class App < Sinatra::Base
     pg_connection.exec 'select * from reset_db()'
     pgvc = Pgvc.init pg_connection, default_branch: 'publish'
     pgvc.track_table 'products'
+    pgvc.create_commit(
+      summary:     'Initial Commit',
+      description: '',
+      user_ref:    'System',
+    )
     redirect '/'
   end
 
@@ -161,8 +166,30 @@ class App < Sinatra::Base
          r.data->'name'   as name,
          r.data->'colour' as colour
       from git.diff() d
-      join vc.rows r using (vc_hash);
+      join vc.rows r using (vc_hash)
+      order by id;
     SQL
     erb :diff
+  end
+
+  # form for committing
+  get '/commit' do
+    erb :commit
+  end
+
+  # commit
+  post '/commit' do
+    pgvc.create_commit(
+      summary:     params['commit']['summary'],
+      description: params['commit']['description'],
+      user_ref:    @username,
+    )
+    redirect '/history'
+  end
+
+  # view history
+  get '/history' do
+    @history = git.log
+    erb :history
   end
 end

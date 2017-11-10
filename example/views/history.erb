@@ -1,0 +1,39 @@
+<style>
+.history tr:nth-child(even) {
+  background-color: #804915;
+  color: #D49E6A;
+}
+.history td {
+  padding: 0.25em 1em;
+  vertical-align: top;
+}
+</style>
+
+
+<h2>History</h2>
+
+
+<table class="history">
+  <tr>
+    <th>Hash</th>
+    <th>Created At</th>
+    <th>User</th>
+    <th>Explanation</th>
+  </tr>
+
+  <% @history.each do |history| %>
+    <tr class="entry">
+      <td><%= history.vc_hash %></td>
+      <td><%= history.created_at %></td>
+      <td><%= history.user_ref %></td>
+      <td>
+        <%= history.summary %>
+        <% if !history.description.to_s.strip.empty? %>
+           <br />
+           <br />
+           <%= history.description %>
+       <% end %>
+      </td>
+    </tr>
+  <% end %>
+</table>
