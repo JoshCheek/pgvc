@@ -78,7 +78,7 @@ RSpec.describe App do
       session.click_on 'Branches'
       expect(session.all('.branch .name').map(&:text)).to eq ['publish']
       session.fill_in 'Name', with: 'mahbranch'
-      session.find('input[name="Create Branch"]').click
+      session.click_on 'Create Branch'
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
     end
 
@@ -88,7 +88,7 @@ RSpec.describe App do
       session.visit '/'
       session.click_on 'Branches'
       session.fill_in 'Name', with: 'mahbranch'
-      session.find('input[name="Create Branch"]').click
+      session.click_on 'Create Branch'
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
 
       # check it out
