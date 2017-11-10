@@ -96,7 +96,10 @@ class App < Sinatra::Base
   # delete '/branches'
 
   # # checkout a branch
-  # post '/branch'
+  post '/branch' do
+    git.checkout params['branch']['name']
+    redirect '/branches'
+  end
 
   # display the products
   get '/' do

@@ -77,11 +77,19 @@ RSpec.describe App do
       session.find('input[name="Create Branch"]').click
       expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
     end
-    xspecify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete' do
+    specify 'lists the branches with the user\'s current branch highlighted and a button to checkout/delete' do
       login
       visit '/branches'
-      expect(page.all('.branch .name').map(&:text)).to eq ['publish']
-      raise 'now do smth else'
+      session.fill_in 'Name', with: 'mahbranch'
+      session.find('input[name="Create Branch"]').click
+      expect(session.all('.branch .name').map(&:text).sort).to eq ['mahbranch', 'publish']
+      expect(session.find('.branch.current .name').text).to eq 'publish'
+      branches = session.all '.branch'
+      mahbranch = branches.find { |b| b.text.include? 'mahbranch' }
+      session.within mahbranch do
+        session.click_on 'checkout'
+      end
+      expect(session.find('.branch.current .name').text).to eq 'mahbranch'
     end
   end
 

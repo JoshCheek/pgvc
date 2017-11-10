@@ -11,10 +11,21 @@
     <th>commit_hash</th>
   </tr>
   <% @branches.each do |branch| %>
-    <tr class="branch <%= "default" if branch.default? %>">
+    <%
+      css_class = "branch"
+      css_class << " default" if branch.default?
+      css_class << " current" if branch.current?
+    %>
+    <tr class="<%= css_class %>">
       <td class="id"><%= branch.id %></td>
       <td class="name"><%= branch.name %></td>
       <td class="hash"><%= branch.commit_hash %></td>
+      <td class="checkout">
+        <form action="/branch" method="post">
+          <input type="hidden" name="branch[name]" value="<%= branch.name %>" />
+          <input type="submit" name="checkout" value="checkout" />
+        </form>
+      </td>
     </tr>
   <% end %>
 </table>
