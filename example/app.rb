@@ -20,8 +20,8 @@ create or replace function reset_db() returns void as $$
     end loop;
     drop schema if exists vc cascade;
     drop schema if exists git cascade;
-    drop table if exists users;
-    drop table if exists products;
+    drop table  if exists users;
+    drop table  if exists products;
     create table products (
       id serial primary key,
       name text,
@@ -48,20 +48,15 @@ class App < Sinatra::Base
   attr_reader :username, :branch, :git
   alias logged_in? username
 
-  # before do
-  #   print env['REQUEST_METHOD'], "\t", env['PATH_INFO'], "\n"
-  #   p params
-  # end
-
   def call(env)
     ActiveRecord::Base.connection_pool.with_connection do |ar_conn|
       pg_conn  = ar_conn.raw_connection
       username = env['rack.session']['username'] || 'anonymous'
       env['pgvc.pg_connection'] = pg_conn
       @git = Pgvc::Git.new(pg_conn)
-      git.config_user_ref(username)
-      @branch = git.branch.find(&:current?)
       begin
+        git.config_user_ref(username)
+        @branch = git.branch.find(&:current?)
         super(env)
       ensure
         git.exec 'set search_path = public;' # FIXME: dumb hack
@@ -112,8 +107,7 @@ class App < Sinatra::Base
   # create a new branch
   post '/branches' do
     git.branch params['new_branch_name']
-    @branches = git.branch
-    erb :branches
+    redirect '/branches'
   end
 
   # delete a branch
@@ -162,9 +156,9 @@ class App < Sinatra::Base
   get '/diff' do
     @rows = git.exec <<~SQL
       select d.action,
-         r.data->'id'     as id,
-         r.data->'name'   as name,
-         r.data->'colour' as colour
+             r.data->'id'     as id,
+             r.data->'name'   as name,
+             r.data->'colour' as colour
       from git.diff() d
       join vc.rows r using (vc_hash)
       order by id;
