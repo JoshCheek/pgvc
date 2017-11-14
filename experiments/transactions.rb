@@ -89,6 +89,20 @@ end
 
 
 # `SAVEPOINT`S ALLOW PARTIAL ROLLBACKS / PARTIAL COMMITS (kiiiiinda like nested transactions)
+  # Okay, these seem pretty pointless:
+  # > Savepoints are going to increase overhead and have no effect on the
+  # > length of the transaction. If you want to catch errors and not have to
+  # > redo the entire transaction, they're great, but that's about it.
+  # -- Steve Atkins (27 Nov 2012) http://www.postgresql-archive.org/Savepoints-in-transactions-for-speed-td5733814.html
+  #
+  # I don't understand why you would add savepoints, it seems like this feature
+  # should instead be to allow transactions to be nested. Eg that seems much
+  # more composable, because then you don't need to know you are already in
+  # a transaction, and don't need to worry about your savepoint name colliding.
+  # But maybe I'm missing something, eg b/c the remaining code could be unsent,
+  # maybe it doesn't have a good way to decide how far up the nested transactions
+  # it should bubble the error. IDK, just guessing here.
+
   reset_strs!
   # insert 'a' before any savepoints
   trnxn.exec "begin"
