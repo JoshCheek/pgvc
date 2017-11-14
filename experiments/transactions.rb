@@ -126,6 +126,7 @@ end
   trnxn.exec "begin"
 
   # can see the world's changes
+  trnxn.exec "select * from strs" # => [{"val"=>"pre"}]
   world.exec "insert into strs (val) values ('within')"
   trnxn.exec "select * from strs" # => [{"val"=>"pre"}, {"val"=>"within"}]
 
