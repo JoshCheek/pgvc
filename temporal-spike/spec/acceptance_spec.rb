@@ -76,16 +76,16 @@ RSpec.describe 'acceptance test' do
       ]
 
     # Test
-    ap db.exec("select schema_name from information_schema.schemata where schema_name ilike 'test%'").to_a
-    result = db.exec "select pgvc_temporal.bootstrap('test1')"
-    ap db.exec("select schema_name from information_schema.schemata where schema_name ilike 'test%'").to_a
-
-    require "pry"
-    binding.pry
     # call the bootstrap fn
+    db.exec "select pgvc_temporal.bootstrap('test1')"
+
     # for each table
     #   add it to temporal vc
+    db.exec "select pgvc_temporal.add_versioning_to_table('test1', 'categories')"
+    db.exec "select pgvc_temporal.add_versioning_to_table('test1', 'products')"
+
     # I can still select/insert/update/delete to that table
+
     # I set my time to the past
     # I see the past data when I select
     # I can no longer insert / update / delete
