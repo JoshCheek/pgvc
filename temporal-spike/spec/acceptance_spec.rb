@@ -9,26 +9,11 @@ db = PG.connect(dbname: dbname)
 db.exec <<~SQL
 create schema if not exists pgvc_temporal;
 
-do $$
-begin
-  raise notice 'schema exist: %',
-    (select schema_name
-     from information_schema.schemata
-     where schema_name = 'pgvc_temporal');
-end $$ language plpgsql;
-
 create or replace function
   pgvc_temporal.bootstrap(schemaname text)
   returns void as $$
   begin
-    raise notice '%', 'omg omg omg omg';
-    perform format('create schema %I_versions;', schemaname);
-
-    raise notice 'schema exist: %',
-      (select schema_name
-       from information_schema.schemata
-       where schema_name = 'test1_versions');
-
+    execute format('create schema %I_versions;', schemaname);
     -- later: create the variable that stores the "effective time"
   end $$ language plpgsql;
 SQL
@@ -51,7 +36,7 @@ RSpec.describe 'acceptance test' do
     sql = ''
     tables.each do |table, records|
       records.map do |record|
-        sql << "insert into #{table} (#{record.keys.join(',')}) values (#{record.values.join(',')});"
+        sql << "insert into test1.#{table} (#{record.keys.join(',')}) values (#{record.values.join(',')});"
       end
     end
     db.exec sql
@@ -73,7 +58,7 @@ RSpec.describe 'acceptance test' do
       id          serial primary key,
       name        text,
       colour      text,
-      category_id integer references categories(id)
+      category_id integer references test1.categories(id)
     );
     SQL
 
@@ -91,7 +76,9 @@ RSpec.describe 'acceptance test' do
       ]
 
     # Test
+    ap db.exec("select schema_name from information_schema.schemata where schema_name ilike 'test%'").to_a
     result = db.exec "select pgvc_temporal.bootstrap('test1')"
+    ap db.exec("select schema_name from information_schema.schemata where schema_name ilike 'test%'").to_a
 
     require "pry"
     binding.pry
