@@ -1,6 +1,16 @@
 defmodule JoshTestTest do
+  # This lets you place `IEx.pry` in the code, the same way you would use `binding.pry` in Ruby.
+  # Note that to use that, you must run the tests with `iex -S mix test`
+  require IEx
+
   use ExUnit.Case
   doctest JoshTest
+
+  def get_db do
+    dbconfig   = Application.get_env(:josh_test, JoshTest.Repo)
+    {:ok, pid} = Postgrex.start_link database: dbconfig[:database]
+    pid
+  end
 
   def first_row(result) do
     # eg: %Postgrex.Result{
@@ -14,9 +24,13 @@ defmodule JoshTestTest do
     row
   end
 
-  test "greets the world" do
-    {:ok, pid} = Postgrex.start_link database: "pgvc_testing"
-    result = Postgrex.query! pid, "SELECT name FROM users", []
+  test "can insert and query a user" do
+    db = get_db()
+    Postgrex.query! db, "begin", []
+    Postgrex.query! db, "create table users (id serial primary key, name text)", []
+    Postgrex.query! db, "insert into users (name) values ('josh')", []
+    result = Postgrex.query! db, "select name from users", []
     assert first_row(result) == ["josh"]
+    Postgrex.query! db, "rollback", []
   end
 end
