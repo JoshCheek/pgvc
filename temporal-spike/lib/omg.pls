@@ -1,5 +1,21 @@
 create schema if not exists pgvc_temporal;
 
+-- functions to manage the current time, the time we are viewing the DB from
+create or replace function
+  pgvc_temporal.timetravel_to(text) returns text as $$
+  begin
+    perform set_config('pgvc_temporal.timetravel_time', $1, false);
+    return $1;
+  end $$ language plpgsql;
+
+create or replace function
+  pgvc_temporal.timetravel_time() returns timestamp as $$
+  select coalesce(
+    current_setting('pgvc_temporal.timetravel_time', true)::timestamp,
+    now()
+  )::timestamp
+  $$ language sql;
+
 create or replace function
   pgvc_temporal.addVersioningToSchema(schemaname text)
   returns void as $fn$
@@ -59,7 +75,7 @@ create or replace function
 
         EXECUTE format(
           'CREATE OR REPLACE VIEW %I.%I AS' ||
-            ' SELECT DISTINCT record_id as id, ' || tbl_cols ||
+            ' SELECT record_id as id, ' || tbl_cols ||
             ' FROM %I.%I WHERE assert_time <= now() AND' ||
             ' (retract_time > now() OR retract_time IS NULL)' ||
             ' ORDER BY record_id ASC, id DESC;', schemaname, tbl.name, versioned_schemaname, tbl.name);
