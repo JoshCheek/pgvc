@@ -31,6 +31,30 @@ RSpec.describe 'acceptance test' do
     db.exec sql
   end
 
+
+  def update(db, tables)
+    sql = ''
+    tables.each do |table, updates|
+      updates.map do |update|
+        update = update.dup
+        id = update.delete :id
+        update_sql = update.map { |k, v| "#{k} = #{v}" }.join(" ")
+        sql << "update test1.#{table} set #{update_sql} where id = #{id};"
+      end
+    end
+    db.exec sql
+  end
+
+
+  def delete(db, tables)
+    sql = ''
+    tables.each do |table, ids|
+      sql << "delete from test1.#{table} where id in (#{ids.join(", ")});"
+    end
+    db.exec sql
+  end
+
+
   it 'can put an existing db into temporal version control' do
     # Setup
     db.exec <<~SQL
@@ -64,11 +88,11 @@ RSpec.describe 'acceptance test' do
         {name: "'pipe'", colour: "'pipe-coloured'", category_id: 2},
       ]
 
-    # Test
-    # version the schema
+    # Version the schema
     db.exec "select pgvc_temporal.addVersioningToSchema('test1')"
 
-    # I can still select/insert/update/delete to that table
+    # Test
+    # I can still select data
     cats = db.exec("select * from test1.categories")
     ids, names, is_preferreds = cats.map { |c| c.values }.transpose
     expect(ids).to eq %w[1 2 3]
@@ -81,6 +105,29 @@ RSpec.describe 'acceptance test' do
     expect(names).to eq %w[wire bulb pipe]
     expect(colours).to eq %w[green bright pipe-coloured]
     expect(category_ids).to eq %w[1 1 2]
+
+    # I can still insert data
+    insert db, products: [{name: "'tv'", colour: "'black'", category_id: 1}]
+
+    # I can still update data
+    update db, products: [{id: 3, colour: "'rust'"}]
+
+    # I can still delete data
+    delete db, products: [2]
+
+    # I see the changes I made
+    cats = db.exec("select * from test1.categories")
+    ids, names, is_preferreds = cats.map { |c| c.values }.transpose
+    expect(ids).to eq %w[1 2 3]
+    expect(names).to eq %w[electrical plumbing blasting]
+    expect(is_preferreds).to eq %w[f t f]
+
+    cats = db.exec("select * from test1.products")
+    ids, names, colours, category_ids = cats.map { |c| c.values }.transpose
+    expect(ids).to eq %w[1 3 4]
+    expect(names).to eq %w[wire pipe tv]
+    expect(colours).to eq %w[green rust black]
+    expect(category_ids).to eq %w[1 2 1]
 
     # I set my time to the past
     # I see the past data when I select
