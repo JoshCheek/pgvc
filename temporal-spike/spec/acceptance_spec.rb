@@ -5,19 +5,23 @@ dbname = 'pgvc_temporal_test'
 # PG.connect(dbname: 'postgres').exec("create database #{dbname}")
 
 db = PG.connect(dbname: dbname)
+db.exec <<~SQL
+  drop schema if exists test1 cascade;
+  drop schema if exists test1_versions cascade;
+SQL
 db.exec File.read(File.expand_path '../lib/omg.pls', __dir__)
 
 
 RSpec.describe 'acceptance test' do
-  around do |spec|
-    db.exec 'begin'
-    spec.call
-    db.exec 'rollback'
-  end
-
-  def show(db)
+  def show_view(db)
     cats  = db.exec('select * from test1.categories').to_a
     prods = db.exec('select * from test1.products').to_a
+    ap categories: cats, products: prods
+  end
+
+  def show_versions(db)
+    cats  = db.exec('select * from test1_versions.categories').to_a
+    prods = db.exec('select * from test1_versions.products').to_a
     ap categories: cats, products: prods
   end
 
@@ -55,7 +59,7 @@ RSpec.describe 'acceptance test' do
   end
 
   def now(db)
-    db.exec('select now()')[0]['now']
+    db.exec('select current_timestamp')[0].values.first
   end
 
 
@@ -135,6 +139,7 @@ RSpec.describe 'acceptance test' do
 
     # View data before modifications
     db.exec "select pgvc_temporal.timetravel_to('#{t1}')"
+    result = db.exec "select pgvc_temporal.timetravel_time()"
 
     cats = db.exec("select * from test1.categories")
     ids, names, is_preferreds = cats.map { |c| c.values }.transpose
@@ -151,7 +156,7 @@ RSpec.describe 'acceptance test' do
 
     # I see the past data when I select
     # I can no longer insert / update / delete
-
-    show db
+    # show_view db
+    # show_versions db
   end
 end

@@ -43,12 +43,14 @@ create or replace function
         EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I_pkey CASCADE',              versioned_schemaname, tbl.name, tbl.name);
         EXECUTE format('ALTER TABLE %I.%I RENAME COLUMN id TO record_id',                versioned_schemaname, tbl.name);
         EXECUTE format('ALTER TABLE %I.%I ADD COLUMN id SERIAL PRIMARY KEY',             versioned_schemaname, tbl.name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN assert_time abstime DEFAULT now()', versioned_schemaname, tbl.name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN retract_time abstime',              versioned_schemaname, tbl.name);
+        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN assert_time timestamp DEFAULT now()', versioned_schemaname, tbl.name);
+        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN retract_time timestamp',              versioned_schemaname, tbl.name);
 
         EXECUTE format('CREATE INDEX IF NOT EXISTS %I_record_id ON %I_versions.%I (record_id)', tbl.name, schemaname, tbl.name);
         EXECUTE format('CREATE INDEX IF NOT EXISTS %I_assert_time ON %I_versions.%I (assert_time)', tbl.name, schemaname, tbl.name);
         EXECUTE format('CREATE INDEX IF NOT EXISTS %I_retract_time ON %I_versions.%I (retract_time)', tbl.name, schemaname, tbl.name);
+
+        -- TODO: set assert_time
 
         -- EXECUTE format('CREATE UNIQUE INDEX IF NOT EXISTS %I_have_a_single_future_version ON %I_versions.%I (record_id) WHERE assert_time IS NULL',
         --           tbl.name,
@@ -76,9 +78,47 @@ create or replace function
         EXECUTE format(
           'CREATE OR REPLACE VIEW %I.%I AS' ||
             ' SELECT record_id as id, ' || tbl_cols ||
-            ' FROM %I.%I WHERE assert_time <= now() AND' ||
-            ' (retract_time > now() OR retract_time IS NULL)' ||
+            ' FROM %I.%I WHERE assert_time <= pgvc_temporal.timetravel_time() AND' ||
+            ' (retract_time > pgvc_temporal.timetravel_time() OR retract_time IS NULL)' ||
             ' ORDER BY record_id ASC, id DESC;', schemaname, tbl.name, versioned_schemaname, tbl.name);
+
+        execute format(
+          $$ CREATE OR REPLACE RULE %I_delete AS
+             ON DELETE TO %I.%I
+             DO INSTEAD
+             UPDATE %I.%I
+               SET retract_time = now()
+               WHERE id = OLD.id;
+          $$,
+          tbl.name,
+          versioned_schemaname, tbl.name,
+          versioned_schemaname, tbl.name
+        );
+
+        /* execute format( */
+        /*   $$ CREATE OR REPLACE RULE %I_update AS */
+        /*      ON UPDATE TO %I.%I */
+        /*      DO INSTEAD */
+        /*      UPDATE %I.%I */
+        /*        SET retract_time = now() */
+        /*        WHERE id = OLD.id; */
+        /*      INSERT INTO %I.%I */
+        /*       VALUES ( */
+        /*   $$, */
+        /*   tbl.name, */
+        /*   versioned_schemaname, tbl.name, */
+        /*   versioned_schemaname, tbl.name, */
+        /*   versioned_schemaname, tbl.name */
+        /* ); */
+
+        /* CREATE RULE %I.%I_insert AS */
+        /*   ON INSERT TO %I.%I */
+        /*   DO INSTEAD */
+        /*   INSERT INTO %I.%I VALUES (NEW.sl_name); */
+        /* versioned_schemaname, tbl.name, */
+        /* versioned_schemaname, tbl.name, */
+        /* versioned_schemaname, tbl.name, */
+
         --EXECUTE format('CREATE OR REPLACE VIEW %I_future.%I AS SELECT DISTINCT(record_id) as id, ' || tbl_cols || ' FROM %I_versions.%I WHERE (assert_time <= now() OR assert_time IS NULL) ORDER BY record_id ASC, id DESC;', schemaname, tbl.name, schemaname, tbl.name);
     END LOOP;
 
