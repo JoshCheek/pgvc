@@ -5,18 +5,7 @@ dbname = 'pgvc_temporal_test'
 # PG.connect(dbname: 'postgres').exec("create database #{dbname}")
 
 db = PG.connect(dbname: dbname)
-
-db.exec <<~SQL
-create schema if not exists pgvc_temporal;
-
-create or replace function
-  pgvc_temporal.bootstrap(schemaname text)
-  returns void as $$
-  begin
-    execute format('create schema %I_versions;', schemaname);
-    -- later: create the variable that stores the "effective time"
-  end $$ language plpgsql;
-SQL
+db.exec File.read(File.expand_path '../lib/omg.pls', __dir__)
 
 
 RSpec.describe 'acceptance test' do
@@ -76,16 +65,10 @@ RSpec.describe 'acceptance test' do
       ]
 
     # Test
-    # call the bootstrap fn
-    db.exec "select pgvc_temporal.bootstrap('test1')"
-
-    # for each table
-    #   add it to temporal vc
-    db.exec "select pgvc_temporal.add_versioning_to_table('test1', 'categories')"
-    db.exec "select pgvc_temporal.add_versioning_to_table('test1', 'products')"
+    # version the schema
+    db.exec "select pgvc_temporal.addVersioningToSchema('test1')"
 
     # I can still select/insert/update/delete to that table
-
     # I set my time to the past
     # I see the past data when I select
     # I can no longer insert / update / delete
