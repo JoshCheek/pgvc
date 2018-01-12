@@ -69,6 +69,19 @@ RSpec.describe 'acceptance test' do
     db.exec "select pgvc_temporal.addVersioningToSchema('test1')"
 
     # I can still select/insert/update/delete to that table
+    cats = db.exec("select * from test1.categories")
+    ids, names, is_preferreds = cats.map { |c| c.values }.transpose
+    expect(ids).to eq %w[1 2 3]
+    expect(names).to eq %w[electrical plumbing blasting]
+    expect(is_preferreds).to eq %w[f t f]
+
+    cats = db.exec("select * from test1.products")
+    ids, names, colours, category_ids = cats.map { |c| c.values }.transpose
+    expect(ids).to eq %w[1 2 3]
+    expect(names).to eq %w[wire bulb pipe]
+    expect(colours).to eq %w[green bright pipe-coloured]
+    expect(category_ids).to eq %w[1 1 2]
+
     # I set my time to the past
     # I see the past data when I select
     # I can no longer insert / update / delete
