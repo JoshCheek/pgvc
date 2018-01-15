@@ -102,31 +102,45 @@ create or replace function
             WHERE table_schema = ''%I_versions''
             AND table_name = ''%I''
             AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl.name) INTO insert_tbl_col_values;
-        
+
         EXECUTE format('SELECT string_agg(column_name, '', '') as names FROM information_schema.columns
             WHERE table_schema = ''%I_versions''
             AND table_name = ''%I''
             AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl.name) INTO insert_tbl_cols;
 
         execute format(
-          $$ CREATE OR REPLACE RULE %I_update AS
-             ON UPDATE TO %I.%I
-             DO INSTEAD
-             (
+          $format$
+          create function %I.%I_update_fn(old %I.%I, new %I.%I) returns void as $$
+            begin
               UPDATE %I.%I
-              SET retract_time = now()
-              WHERE retract_time IS NULL and record_id = OLD.id;
-             INSERT INTO %I.%I (%s, record_id)
-              VALUES (%s, NEW.id);
-              );
-          $$,
-          tbl.name,
+                SET retract_time = now()
+                WHERE retract_time IS NULL
+                AND record_id = OLD.id;
+
+              INSERT INTO %I.%I (%s, record_id)
+                VALUES (%s, NEW.id);
+            end $$ language plpgsql;
+          $format$,
           schemaname, tbl.name,
+          schemaname, tbl.name,
+          schemaname, tbl.name,
+
           versioned_schemaname, tbl.name,
           versioned_schemaname, tbl.name,
           insert_tbl_cols,
           insert_tbl_col_values
-        ); 
+        );
+
+        execute format(
+          $$ CREATE OR REPLACE RULE %I_update AS
+             ON UPDATE TO %I.%I
+             DO INSTEAD (select %I.%I_update_fn(OLD, NEW););
+          $$,
+          tbl.name,
+          schemaname, tbl.name,
+          schemaname, tbl.name
+        );
+
 
         -- execute format(
         --   $$ CREATE OR REPLACE RULE %I_update AS
@@ -146,7 +160,7 @@ create or replace function
         --   versioned_schemaname, tbl.name,
         --   insert_tbl_cols,
         --   insert_tbl_col_values
-        -- ); 
+        -- );
 
         /* CREATE RULE %I.%I_insert AS */
         /*   ON INSERT TO %I.%I */
