@@ -20,9 +20,11 @@ create or replace function
   pgvc_temporal.addVersioningToSchema(schemaname text)
   returns void as $fn$
   declare
-      tbl                  record;
-      tbl_cols             text;
-      versioned_schemaname text;
+      tbl                   record;
+      tbl_cols              text;
+      insert_tbl_col_values text;
+      insert_tbl_cols       text;
+      versioned_schemaname  text;
   begin
     versioned_schemaname := schemaname || '_versions';
 
@@ -85,6 +87,7 @@ create or replace function
         execute format(
           $$ CREATE OR REPLACE RULE %I_delete AS
              ON DELETE TO %I.%I
+             WHERE OLD.retract_time IS NULL
              DO INSTEAD
              UPDATE %I.%I
                SET retract_time = now()
@@ -95,21 +98,55 @@ create or replace function
           versioned_schemaname, tbl.name
         );
 
-        /* execute format( */
-        /*   $$ CREATE OR REPLACE RULE %I_update AS */
-        /*      ON UPDATE TO %I.%I */
-        /*      DO INSTEAD */
-        /*      UPDATE %I.%I */
-        /*        SET retract_time = now() */
-        /*        WHERE id = OLD.id; */
-        /*      INSERT INTO %I.%I */
-        /*       VALUES ( */
-        /*   $$, */
-        /*   tbl.name, */
-        /*   versioned_schemaname, tbl.name, */
-        /*   versioned_schemaname, tbl.name, */
-        /*   versioned_schemaname, tbl.name */
-        /* ); */
+        EXECUTE format('SELECT string_agg(''NEW.'' || column_name, '', '') as names FROM information_schema.columns
+            WHERE table_schema = ''%I_versions''
+            AND table_name = ''%I''
+            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl.name) INTO insert_tbl_col_values;
+        
+        EXECUTE format('SELECT string_agg(column_name, '', '') as names FROM information_schema.columns
+            WHERE table_schema = ''%I_versions''
+            AND table_name = ''%I''
+            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl.name) INTO insert_tbl_cols;
+
+        execute format(
+          $$ CREATE OR REPLACE RULE %I_update AS
+             ON UPDATE TO %I.%I
+             DO INSTEAD
+             (
+              UPDATE %I.%I
+              SET retract_time = now()
+              WHERE retract_time IS NULL and record_id = OLD.id;
+             INSERT INTO %I.%I (%s, record_id)
+              VALUES (%s, NEW.id);
+              );
+          $$,
+          tbl.name,
+          schemaname, tbl.name,
+          versioned_schemaname, tbl.name,
+          versioned_schemaname, tbl.name,
+          insert_tbl_cols,
+          insert_tbl_col_values
+        ); 
+
+        -- execute format(
+        --   $$ CREATE OR REPLACE RULE %I_update AS
+        --      ON UPDATE TO %I.%I
+        --      WHERE OLD.retract_time IS NULL
+        --       AND NEW.retract_time IS NULL
+        --      DO INSTEAD
+        --      (DELETE %I.%I
+        --        WHERE id = OLD.id;
+        --      --INSERT INTO %I.%I (%s)
+        --       --VALUES (%s);
+        --       )
+        --   $$,
+        --   tbl.name,
+        --   versioned_schemaname, tbl.name,
+        --   versioned_schemaname, tbl.name,
+        --   versioned_schemaname, tbl.name,
+        --   insert_tbl_cols,
+        --   insert_tbl_col_values
+        -- ); 
 
         /* CREATE RULE %I.%I_insert AS */
         /*   ON INSERT TO %I.%I */
