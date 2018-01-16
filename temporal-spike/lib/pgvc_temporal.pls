@@ -33,15 +33,15 @@ create or replace function
     execute format('create schema if not exists %I;', schemaname);
 
     for tbl_name in
-        EXECUTE format(
-          $$ SELECT table_name
-             FROM information_schema.tables
-             WHERE table_schema = '%I_versions'
+        execute format(
+          $$ select table_name
+             from information_schema.tables
+             where table_schema = '%I_versions'
           $$,
           schemaname
         )
-    LOOP
-        EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I_pkey CASCADE', versioned_schemaname, tbl_name, tbl_name);
+    loop
+        execute format('alter table %I.%I drop constraint %I_pkey cascade', versioned_schemaname, tbl_name, tbl_name);
 
         execute format('alter table %I.%I add column pgvc_id           serial primary key',      versioned_schemaname, tbl_name);
         execute format('alter table %I.%I add column pgvc_assert_time  timestamp default now()', versioned_schemaname, tbl_name);
@@ -51,24 +51,27 @@ create or replace function
         execute format('create index if not exists %I_pgvc_assert_time  on %I_versions.%I (pgvc_assert_time)',  tbl_name, schemaname, tbl_name);
         execute format('create index if not exists %I_pgvc_retract_time on %I_versions.%I (pgvc_retract_time)', tbl_name, schemaname, tbl_name);
 
-        -- TODO: set pgvc_assert_time
-
-        EXECUTE format(
-          $$ SELECT string_agg(column_name, ', ') as names FROM information_schema.columns
-             WHERE table_schema = '%I_versions'
-             AND table_name = %L
-             AND column_name NOT IN ('pgvc_id', 'pgvc_assert_time', 'pgvc_retract_time')
+        execute format(
+          $$ select string_agg(column_name, ', ') as names from information_schema.columns
+             where table_schema = '%I_versions'
+             and table_name = %L
+             and column_name not in ('pgvc_id', 'pgvc_assert_time', 'pgvc_retract_time')
           $$,
           schemaname,
           tbl_name
-        ) INTO tbl_cols;
+        ) into tbl_cols;
 
-        EXECUTE format(
-          'CREATE OR REPLACE VIEW %I.%I AS' ||
-            ' SELECT ' || tbl_cols ||
-            ' FROM %I.%I WHERE pgvc_assert_time <= pgvc_temporal.timetravel_time() AND' ||
-            ' (pgvc_retract_time > pgvc_temporal.timetravel_time() OR pgvc_retract_time IS NULL)' ||
-            ' ORDER BY id ASC;', schemaname, tbl_name, versioned_schemaname, tbl_name);
+        execute format(
+          $$ CREATE OR REPLACE VIEW %I.%I AS
+             SELECT $$ || tbl_cols || $$
+             FROM %I.%I WHERE pgvc_assert_time <= pgvc_temporal.timetravel_time() AND
+             (pgvc_retract_time > pgvc_temporal.timetravel_time() OR pgvc_retract_time IS NULL)
+          $$,
+          schemaname,
+          tbl_name,
+          versioned_schemaname,
+          tbl_name
+        );
 
         execute format(
           $$ CREATE OR REPLACE RULE %I_delete AS

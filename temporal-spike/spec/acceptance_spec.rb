@@ -62,6 +62,18 @@ RSpec.describe 'acceptance test' do
     db.exec('select current_timestamp')[0].values.first
   end
 
+  def assert_rows(db, table_assertions)
+    table_assertions.each do |table, row_assertions|
+      actual_rows = db.exec("select * from test1.#{table}").map(&:to_h)
+      expected_rows = row_assertions.map do |row_assertion|
+        row_assertion.map { |k, v| [k.to_s, v.to_s] }.to_h
+      end
+      actual_rows.sort_by! { |row| row['id'].to_i }
+      expected_rows.sort_by! { |row| row['id'].to_i }
+      expect(actual_rows).to eq expected_rows
+    end
+  end
+
 
   it 'can put an existing db into temporal version control' do
     # Setup
@@ -102,18 +114,17 @@ RSpec.describe 'acceptance test' do
     # Test
 
     # Before modification
-    cats = db.exec("select * from test1.categories")
-    ids, names, is_preferreds = cats.map { |c| c.values }.transpose
-    expect(ids).to eq %w[1 2 3]
-    expect(names).to eq %w[electrical plumbing blasting]
-    expect(is_preferreds).to eq %w[f t f]
-
-    cats = db.exec("select * from test1.products")
-    ids, names, colours, category_ids = cats.map { |c| c.values }.transpose
-    expect(ids).to eq %w[1 2 3]
-    expect(names).to eq %w[wire bulb pipe]
-    expect(colours).to eq %w[green bright pipe-coloured]
-    expect(category_ids).to eq %w[1 1 2]
+    assert_rows db,
+      categories: [
+        {id: 1, name: 'electrical', is_preferred: 'f'},
+        {id: 2, name: 'plumbing',   is_preferred: 't'},
+        {id: 3, name: 'blasting',   is_preferred: 'f'},
+      ],
+      products: [
+        {id: 1, name: 'wire', colour: 'green',         category_id: 1},
+        {id: 2, name: 'bulb', colour: 'bright',        category_id: 1},
+        {id: 3, name: 'pipe', colour: 'pipe-coloured', category_id: 2},
+      ]
 
     t1 = now db
     insert db, products: [{name: "'tv'", colour: "'black'", category_id: 1}] # insert
@@ -124,35 +135,31 @@ RSpec.describe 'acceptance test' do
     t4 = now db
 
     # After modification
-    cats = db.exec("select * from test1.categories")
-    ids, names, is_preferreds = cats.map { |c| c.values }.transpose
-    expect(ids).to eq %w[1 2 3]
-    expect(names).to eq %w[electrical plumbing blasting]
-    expect(is_preferreds).to eq %w[f t f]
-
-    cats = db.exec("select * from test1.products")
-    ids, names, colours, category_ids = cats.map { |c| c.values }.transpose
-    expect(ids).to eq %w[1 3 4]
-    expect(names).to eq %w[wire pipe tv]
-    expect(colours).to eq %w[green rust black]
-    expect(category_ids).to eq %w[1 2 1]
+    assert_rows db,
+      categories: [
+        {id: 1, name: 'electrical', is_preferred: 'f'},
+        {id: 2, name: 'plumbing',   is_preferred: 't'},
+        {id: 3, name: 'blasting',   is_preferred: 'f'},
+      ],
+      products: [
+        {id: 1, name: 'wire', colour: 'green', category_id: 1},
+        {id: 3, name: 'pipe', colour: 'rust',  category_id: 2},
+        {id: 4, name: 'tv',   colour: 'black', category_id: 1},
+      ]
 
     # View data before modifications
     db.exec "select pgvc_temporal.timetravel_to('#{t1}')"
-    result = db.exec "select pgvc_temporal.timetravel_time()"
-
-    cats = db.exec("select * from test1.categories")
-    ids, names, is_preferreds = cats.map { |c| c.values }.transpose
-    expect(ids).to eq %w[1 2 3]
-    expect(names).to eq %w[electrical plumbing blasting]
-    expect(is_preferreds).to eq %w[f t f]
-
-    cats = db.exec("select * from test1.products")
-    ids, names, colours, category_ids = cats.map { |c| c.values }.transpose
-    expect(ids).to eq %w[1 2 3]
-    expect(names).to eq %w[wire bulb pipe]
-    expect(colours).to eq %w[green bright pipe-coloured]
-    expect(category_ids).to eq %w[1 1 2]
+    assert_rows db,
+      categories: [
+        {id: 1, name: 'electrical', is_preferred: 'f'},
+        {id: 2, name: 'plumbing',   is_preferred: 't'},
+        {id: 3, name: 'blasting',   is_preferred: 'f'},
+      ],
+      products: [
+        {id: 1, name: 'wire', colour: 'green',         category_id: 1},
+        {id: 2, name: 'bulb', colour: 'bright',        category_id: 1},
+        {id: 3, name: 'pipe', colour: 'pipe-coloured', category_id: 2},
+      ]
 
     # I see the past data when I select
     # I can no longer insert / update / delete
