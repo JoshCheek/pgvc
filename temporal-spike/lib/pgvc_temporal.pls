@@ -41,15 +41,15 @@ create or replace function
         schemaname
       )
     loop
-      execute format('alter table %I.%I drop constraint %I_pkey cascade', versioned_schemaname, tbl_name, tbl_name);
+      execute format('alter table %I.%I drop constraint if exists %I_pkey cascade', versioned_schemaname, tbl_name, tbl_name);
 
       execute format('alter table %I.%I add column pgvc_id      serial primary key',      versioned_schemaname, tbl_name);
       execute format('alter table %I.%I add column assert_time  timestamp default now()', versioned_schemaname, tbl_name);
       execute format('alter table %I.%I add column retract_time timestamp',               versioned_schemaname, tbl_name);
 
       execute format('create index if not exists %I_pgvc_id           on %I_versions.%I (pgvc_id)',      tbl_name, schemaname, tbl_name);
-      execute format('create index if not exists %I_pgvc_assert_time  on %I_versions.%I (assert_time)',  tbl_name, schemaname, tbl_name);
-      execute format('create index if not exists %I_pgvc_retract_time on %I_versions.%I (retract_time)', tbl_name, schemaname, tbl_name);
+      execute format('create index if not exists %I_assert_time  on %I_versions.%I (assert_time)',  tbl_name, schemaname, tbl_name);
+      execute format('create index if not exists %I_retract_time on %I_versions.%I (retract_time)', tbl_name, schemaname, tbl_name);
 
       execute format(
         $$ select string_agg(column_name, ', ') as names from information_schema.columns
