@@ -20,7 +20,7 @@ create or replace function
   pgvc_temporal.add_versioning_to_schema(schemaname text)
   returns void as $fn$
   declare
-    tbl                   record;
+    tbl_name              text;
     tbl_cols              text;
     insert_tbl_col_values text;
     insert_tbl_cols       text;
@@ -28,27 +28,28 @@ create or replace function
   begin
     versioned_schemaname := schemaname || '_versions';
 
-    EXECUTE format('ALTER SCHEMA %I RENAME TO %I;', schemaname, versioned_schemaname);
-    EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I;', schemaname);
+    -- rename, so we don't have to copy the data
+    execute format('alter schema %I rename to %I;', schemaname, versioned_schemaname);
+    execute format('create schema if not exists %I;', schemaname);
 
-    FOR tbl IN
+    for tbl_name in
         EXECUTE format(
-          $$ SELECT table_name AS name
+          $$ SELECT table_name
              FROM information_schema.tables
              WHERE table_schema = '%I_versions'
           $$,
           schemaname
         )
     LOOP
-        EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I_pkey CASCADE',                versioned_schemaname, tbl.name, tbl.name);
-        EXECUTE format('ALTER TABLE %I.%I RENAME COLUMN id TO record_id',                  versioned_schemaname, tbl.name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN id SERIAL PRIMARY KEY',               versioned_schemaname, tbl.name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN assert_time timestamp DEFAULT now()', versioned_schemaname, tbl.name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN retract_time timestamp',              versioned_schemaname, tbl.name);
+        EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I_pkey CASCADE',                versioned_schemaname, tbl_name, tbl_name);
+        EXECUTE format('ALTER TABLE %I.%I RENAME COLUMN id TO record_id',                  versioned_schemaname, tbl_name);
+        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN id SERIAL PRIMARY KEY',               versioned_schemaname, tbl_name);
+        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN assert_time timestamp DEFAULT now()', versioned_schemaname, tbl_name);
+        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN retract_time timestamp',              versioned_schemaname, tbl_name);
 
-        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_record_id ON %I_versions.%I (record_id)', tbl.name, schemaname, tbl.name);
-        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_assert_time ON %I_versions.%I (assert_time)', tbl.name, schemaname, tbl.name);
-        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_retract_time ON %I_versions.%I (retract_time)', tbl.name, schemaname, tbl.name);
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_record_id ON %I_versions.%I (record_id)', tbl_name, schemaname, tbl_name);
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_assert_time ON %I_versions.%I (assert_time)', tbl_name, schemaname, tbl_name);
+        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_retract_time ON %I_versions.%I (retract_time)', tbl_name, schemaname, tbl_name);
 
         -- TODO: set assert_time
 
@@ -59,7 +60,7 @@ create or replace function
              AND column_name NOT IN ('id', 'record_id', 'assert_time', 'retract_time')
           $$,
           schemaname,
-          tbl.name
+          tbl_name
         ) INTO tbl_cols;
 
         -- EXECUTE format(
@@ -70,7 +71,7 @@ create or replace function
         --      AND column_name NOT IN ('id', 'record_id', 'assert_time', 'retract_time')
         --   $$,
         --   versioned_schemaname,
-        --   tbl.name
+        --   tbl_name
         -- )
         -- INTO tbl_cols;
 
@@ -79,7 +80,7 @@ create or replace function
             ' SELECT record_id as id, ' || tbl_cols ||
             ' FROM %I.%I WHERE assert_time <= pgvc_temporal.timetravel_time() AND' ||
             ' (retract_time > pgvc_temporal.timetravel_time() OR retract_time IS NULL)' ||
-            ' ORDER BY record_id ASC, id DESC;', schemaname, tbl.name, versioned_schemaname, tbl.name);
+            ' ORDER BY record_id ASC, id DESC;', schemaname, tbl_name, versioned_schemaname, tbl_name);
 
         execute format(
           $$ CREATE OR REPLACE RULE %I_delete AS
@@ -90,20 +91,20 @@ create or replace function
                SET retract_time = now()
                WHERE id = OLD.id;
           $$,
-          tbl.name,
-          versioned_schemaname, tbl.name,
-          versioned_schemaname, tbl.name
+          tbl_name,
+          versioned_schemaname, tbl_name,
+          versioned_schemaname, tbl_name
         );
 
         EXECUTE format('SELECT string_agg(''NEW.'' || column_name, '', '') as names FROM information_schema.columns
             WHERE table_schema = ''%I_versions''
             AND table_name = ''%I''
-            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl.name) INTO insert_tbl_col_values;
+            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl_name) INTO insert_tbl_col_values;
 
         EXECUTE format('SELECT string_agg(column_name, '', '') as names FROM information_schema.columns
             WHERE table_schema = ''%I_versions''
             AND table_name = ''%I''
-            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl.name) INTO insert_tbl_cols;
+            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl_name) INTO insert_tbl_cols;
 
         execute format(
           $format$
@@ -118,12 +119,12 @@ create or replace function
                 VALUES (%s, NEW.id);
             end $$ language plpgsql;
           $format$,
-          schemaname, tbl.name,
-          schemaname, tbl.name,
-          schemaname, tbl.name,
+          schemaname, tbl_name,
+          schemaname, tbl_name,
+          schemaname, tbl_name,
 
-          versioned_schemaname, tbl.name,
-          versioned_schemaname, tbl.name,
+          versioned_schemaname, tbl_name,
+          versioned_schemaname, tbl_name,
           insert_tbl_cols,
           insert_tbl_col_values
         );
@@ -133,9 +134,9 @@ create or replace function
              ON UPDATE TO %I.%I
              DO INSTEAD (select %I.%I_update_fn(OLD, NEW););
           $$,
-          tbl.name,
-          schemaname, tbl.name,
-          schemaname, tbl.name
+          tbl_name,
+          schemaname, tbl_name,
+          schemaname, tbl_name
         );
     END LOOP;
 
