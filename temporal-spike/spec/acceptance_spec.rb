@@ -9,7 +9,7 @@ db.exec <<~SQL
   drop schema if exists test1 cascade;
   drop schema if exists test1_versions cascade;
 SQL
-db.exec File.read(File.expand_path '../lib/omg.pls', __dir__)
+db.exec File.read(File.expand_path '../lib/pgvc_temporal.pls', __dir__)
 
 
 RSpec.describe 'acceptance test' do
