@@ -97,7 +97,7 @@ RSpec.describe 'acceptance test' do
       ]
 
     # Version the schema
-    db.exec "select pgvc_temporal.addVersioningToSchema('test1')"
+    db.exec "select pgvc_temporal.add_versioning_to_schema('test1')"
 
     # Test
 
