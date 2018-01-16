@@ -41,54 +41,42 @@ create or replace function
           schemaname
         )
     LOOP
-        EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I_pkey CASCADE',                versioned_schemaname, tbl_name, tbl_name);
-        EXECUTE format('ALTER TABLE %I.%I RENAME COLUMN id TO record_id',                  versioned_schemaname, tbl_name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN id SERIAL PRIMARY KEY',               versioned_schemaname, tbl_name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN assert_time timestamp DEFAULT now()', versioned_schemaname, tbl_name);
-        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN retract_time timestamp',              versioned_schemaname, tbl_name);
+        EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I_pkey CASCADE', versioned_schemaname, tbl_name, tbl_name);
 
-        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_record_id ON %I_versions.%I (record_id)', tbl_name, schemaname, tbl_name);
-        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_assert_time ON %I_versions.%I (assert_time)', tbl_name, schemaname, tbl_name);
-        EXECUTE format('CREATE INDEX IF NOT EXISTS %I_retract_time ON %I_versions.%I (retract_time)', tbl_name, schemaname, tbl_name);
+        execute format('alter table %I.%I add column pgvc_id           serial primary key',      versioned_schemaname, tbl_name);
+        execute format('alter table %I.%I add column pgvc_assert_time  timestamp default now()', versioned_schemaname, tbl_name);
+        execute format('alter table %I.%I add column pgvc_retract_time timestamp',               versioned_schemaname, tbl_name);
 
-        -- TODO: set assert_time
+        execute format('create index if not exists %I_pgvc_id           on %I_versions.%I (pgvc_id)',           tbl_name, schemaname, tbl_name);
+        execute format('create index if not exists %I_pgvc_assert_time  on %I_versions.%I (pgvc_assert_time)',  tbl_name, schemaname, tbl_name);
+        execute format('create index if not exists %I_pgvc_retract_time on %I_versions.%I (pgvc_retract_time)', tbl_name, schemaname, tbl_name);
+
+        -- TODO: set pgvc_assert_time
 
         EXECUTE format(
           $$ SELECT string_agg(column_name, ', ') as names FROM information_schema.columns
              WHERE table_schema = '%I_versions'
              AND table_name = %L
-             AND column_name NOT IN ('id', 'record_id', 'assert_time', 'retract_time')
+             AND column_name NOT IN ('pgvc_id', 'pgvc_assert_time', 'pgvc_retract_time')
           $$,
           schemaname,
           tbl_name
         ) INTO tbl_cols;
 
-        -- EXECUTE format(
-        --   $$ SELECT string_agg(column_name, ', ') as names
-        --      FROM information_schema.columns
-        --      WHERE table_schema = '%I'
-        --      AND table_name = '%I'
-        --      AND column_name NOT IN ('id', 'record_id', 'assert_time', 'retract_time')
-        --   $$,
-        --   versioned_schemaname,
-        --   tbl_name
-        -- )
-        -- INTO tbl_cols;
-
         EXECUTE format(
           'CREATE OR REPLACE VIEW %I.%I AS' ||
-            ' SELECT record_id as id, ' || tbl_cols ||
-            ' FROM %I.%I WHERE assert_time <= pgvc_temporal.timetravel_time() AND' ||
-            ' (retract_time > pgvc_temporal.timetravel_time() OR retract_time IS NULL)' ||
-            ' ORDER BY record_id ASC, id DESC;', schemaname, tbl_name, versioned_schemaname, tbl_name);
+            ' SELECT ' || tbl_cols ||
+            ' FROM %I.%I WHERE pgvc_assert_time <= pgvc_temporal.timetravel_time() AND' ||
+            ' (pgvc_retract_time > pgvc_temporal.timetravel_time() OR pgvc_retract_time IS NULL)' ||
+            ' ORDER BY id ASC;', schemaname, tbl_name, versioned_schemaname, tbl_name);
 
         execute format(
           $$ CREATE OR REPLACE RULE %I_delete AS
              ON DELETE TO %I.%I
-             WHERE OLD.retract_time IS NULL
+             WHERE OLD.pgvc_retract_time IS NULL
              DO INSTEAD
              UPDATE %I.%I
-               SET retract_time = now()
+               SET pgvc_retract_time = now()
                WHERE id = OLD.id;
           $$,
           tbl_name,
@@ -99,24 +87,24 @@ create or replace function
         EXECUTE format('SELECT string_agg(''NEW.'' || column_name, '', '') as names FROM information_schema.columns
             WHERE table_schema = ''%I_versions''
             AND table_name = ''%I''
-            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl_name) INTO insert_tbl_col_values;
+            AND column_name NOT IN (''pgvc_id'', ''pgvc_assert_time'', ''pgvc_retract_time'')', schemaname, tbl_name) INTO insert_tbl_col_values;
 
         EXECUTE format('SELECT string_agg(column_name, '', '') as names FROM information_schema.columns
             WHERE table_schema = ''%I_versions''
             AND table_name = ''%I''
-            AND column_name NOT IN (''id'', ''record_id'', ''assert_time'', ''retract_time'')', schemaname, tbl_name) INTO insert_tbl_cols;
+            AND column_name NOT IN (''pgvc_id'', ''pgvc_assert_time'', ''pgvc_retract_time'')', schemaname, tbl_name) INTO insert_tbl_cols;
 
         execute format(
           $format$
           create function %I.%I_update_fn(old %I.%I, new %I.%I) returns void as $$
             begin
               UPDATE %I.%I
-                SET retract_time = now()
-                WHERE retract_time IS NULL
-                AND record_id = OLD.id;
+                SET pgvc_retract_time = now()
+                WHERE pgvc_retract_time IS NULL
+                AND id = OLD.id;
 
-              INSERT INTO %I.%I (%s, record_id)
-                VALUES (%s, NEW.id);
+              INSERT INTO %I.%I (%s)
+                VALUES (%s);
             end $$ language plpgsql;
           $format$,
           schemaname, tbl_name,
