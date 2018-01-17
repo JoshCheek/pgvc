@@ -108,5 +108,14 @@ RSpec.describe 'acceptance test' do
   end
 
 
-  it 'can deal with wonky ass table and column names'
+  if private_fixture_info = ENV['PRIVATE_FIXTURES_INFO']
+    file, schema = private_fixture_info.split(":")
+    it 'works for all the fixture schemas' do
+      sql = File.read file
+      db.exec %'drop schema if exists "#{schema}" cascade'
+      db.exec %'create schema "#{schema}"'
+      db.exec sql
+      db.exec "select pgvc_temporal.add_versioning_to_schema('#{schema}')"
+    end
+  end
 end
