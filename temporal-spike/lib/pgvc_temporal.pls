@@ -41,6 +41,9 @@ create or replace function
         schemaname
       )
     loop
+      -- can we, instead, loop over each constraint,
+      --   and rather than dropping it,
+      --   modify it to be scoped to the present?
       execute format('alter table %I.%I drop constraint if exists %I_pkey cascade', versioned_schemaname, tbl_name, tbl_name);
 
       execute format('alter table %I.%I add column pgvc_id      serial primary key',      versioned_schemaname, tbl_name);
@@ -52,7 +55,7 @@ create or replace function
       execute format('create index if not exists %I_retract_time on %I_versions.%I (retract_time)', tbl_name, schemaname, tbl_name);
 
       execute format(
-        $$ select string_agg(column_name, ', ') as names from information_schema.columns
+        $$ select string_agg(quote_ident(column_name), ', ') as names from information_schema.columns
            where table_schema = '%I_versions'
            and table_name = %L
            and column_name not in ('pgvc_id', 'assert_time', 'retract_time')
@@ -88,7 +91,7 @@ create or replace function
       );
 
       execute format(
-        $$ select string_agg('new.' || column_name, ', ') as names
+        $$ select string_agg('new.' || quote_ident(column_name), ', ') as names
            from information_schema.columns
            where table_schema = '%I_versions'
            and table_name = '%I'
@@ -99,7 +102,7 @@ create or replace function
       ) into insert_tbl_col_values;
 
       execute format(
-        $$ select string_agg(column_name, ', ') as names
+        $$ select string_agg(quote_ident(column_name), ', ') as names
            from information_schema.columns
            where table_schema = '%I_versions'
            and table_name = '%I'

@@ -102,12 +102,14 @@ RSpec.describe 'acceptance test' do
 
     # show_view db
     # show_versions db
-
-    # TODO:
-    #   fix the primary key and foreign key constraints
   end
 
 
+  # Get a copy of your database's structure, for a given schema
+  # * pg_dump --schema-only --schema=$MYSCHEMA --no-owner $MYDATABASE > structure.sql
+  #
+  # Behaviour added:
+  # * quote_ident on column names
   if private_fixture_info = ENV['PRIVATE_FIXTURES_INFO']
     file, schema = private_fixture_info.split(":")
     it 'works for all the fixture schemas' do
